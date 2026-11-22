@@ -6,7 +6,9 @@ Implements `CONFIG_UI_DESIGN.md` slices a/b.
 
 **In-game results (user screenshots):** `/sm config` opens and renders correctly (Layout & Position page shown: sliders with numeric boxes, grow-direction dropdown, action buttons, footer). No Lua errors reported. Ultra-Minimal preset renders truly bars + text only (acceptance test 2 visual pass). Modern and Compact render correctly. Scale changes keep the meter's fixed edge in place. Grow direction Up/Down works.
 **Added after v0.3.0:** grow direction (`meter.grow`, anchor by top or bottom edge; `/sm grow`; config Layout & Position); scale change preserves on-screen position; slim custom scrollbar (template scrollbar with gold arrows replaced; hidden when page fits).
-**Still to verify in game:** color picker + exact Cancel restore, hex validation, search, Advanced toggles, dependent-control dimming, Revert, Reset category, persistence across reload/relog/restart.
+**v0.3.1 (user-verified):** minimap button (drag, left = settings, right = toggle meter) and Addon Compartment entry work. Icon is a placeholder (`Ability_Marksmanship`); user will supply custom textures later.
+**Custom color picker (D-007):** deployed; awaiting user verification.
+**Still to verify in game:** custom color picker + exact Cancel restore, hex validation, search, Advanced toggles, dependent-control dimming, Revert, Reset category, persistence across reload/relog/restart.
 **Review request for ChatGPT:** screenshot review of the config window (attached by user) — layout, spacing, visual style vs. EllesmereUI inspiration.
 
 **Files:**
