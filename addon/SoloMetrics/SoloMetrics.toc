@@ -1,12 +1,13 @@
 ## Interface: 16001
 ## Title: SoloMetrics
 ## Notes: Personal solo damage meter for WoW: Forever
-## Version: 0.1.0
+## Version: 0.2.0
 ## SavedVariables: SoloMetricsDB
 ## Category: Combat
 
 Core\Bootstrap.lua
 Core\SecretSafety.lua
+Appearance\Theme.lua
 Core\APIAdapter.lua
 Core\Diagnostics.lua
 Analytics\Demo.lua

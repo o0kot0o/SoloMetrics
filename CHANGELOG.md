@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-11-22 (M3 phase 1: style system)
+
+- Every visual layer styleable: backdrop, border, accent, header (each item), rows, icons, bar fill/background/texture, text font/size/outline/shadow, per-column colors and toggles.
+- Presets: Modern Dark, Ultra-Minimal (bars + text only), Text-Only, Compact (`/sm preset`).
+- `/sm get`, `/sm set` for any setting; style profiles in SavedVariables (validated on load).
+- Unlocked outline so a fully transparent meter can still be found and moved.
+- Fix: bars froze during combat (shared render clock). DEMO fight `/sm test`.
+
 ## 0.1.0 — 2026-11-22 (M2 live meter)
 
 - Live personal meter: DPS, damage, timer, Current/Overall; spell rows with icon, name, bar, damage, DPS — updating in combat via native rendering of protected values.

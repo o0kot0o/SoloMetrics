@@ -7,7 +7,7 @@ ns.ADDON_NAME = ADDON_NAME
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 ns.VERSION = (GetMeta and GetMeta(ADDON_NAME, "Version")) or "dev"
 
-local DB_SCHEMA = 2
+local DB_SCHEMA = 3
 local PREFIX = "|cff4fc3f7SoloMetrics|r: "
 
 function ns.Print(msg)
@@ -23,7 +23,6 @@ local METER_DEFAULTS = {
     session = "current",       -- "current" | "overall"
     numberFormat = "compact",  -- "compact" (AbbreviateNumbers) | "full" (BreakUpLargeNumbers)
     maxRows = 8,
-    width = 280,
     smoothBars = true,
     barScale = "top",          -- "top" (relative to top spell) | "total" (share of your total)
 }
@@ -54,7 +53,28 @@ local function InitDB()
     if db.meter.barScale ~= "top" and db.meter.barScale ~= "total" then db.meter.barScale = "top" end
     if db.meter.numberFormat ~= "compact" and db.meter.numberFormat ~= "full" then db.meter.numberFormat = "compact" end
     db.meter.maxRows = math.max(1, math.min(20, math.floor(db.meter.maxRows)))
-    db.meter.width = math.max(180, math.min(600, db.meter.width))
+
+    -- schema 3: appearance lives in style profiles (Appearance/Theme.lua)
+    local oldWidth = db.meter.width
+    db.meter.width = nil
+    if type(db.profiles) ~= "table" then
+        db.profiles = {}
+    end
+    if next(db.profiles) == nil then
+        local style = ns.Theme.BuildPreset("modern")
+        if type(oldWidth) == "number" then style.width = oldWidth end
+        db.profiles.Default = style
+    end
+    for name, style in pairs(db.profiles) do
+        if type(name) ~= "string" then
+            db.profiles[name] = nil
+        else
+            db.profiles[name] = ns.Theme.Validate(style)
+        end
+    end
+    if type(db.activeProfile) ~= "string" or not db.profiles[db.activeProfile] then
+        db.activeProfile = next(db.profiles)
+    end
     ns.db = db
 end
 
@@ -76,6 +96,9 @@ function commands.help()
     ns.Print("  /sm session - switch Current fight / Overall")
     ns.Print("  /sm format - switch compact (12.3K) / full (12,345) numbers")
     ns.Print("  /sm rows <1-20> - max spell rows")
+    ns.Print("  /sm preset [name] - list or apply a style preset")
+    ns.Print("  /sm get [prefix] - list style settings, e.g. /sm get text")
+    ns.Print("  /sm set <setting> <value> - e.g. /sm set backdrop.enabled off")
     ns.Print("  /sm bars - bar length: relative to top spell / share of total")
     ns.Print("  /sm smooth - toggle animated bars")
     ns.Print("  /sm test [seconds] [big] - simulated DEMO fight (fake numbers); again to clear")
@@ -97,6 +120,57 @@ function commands.format()
     m.numberFormat = (m.numberFormat == "compact") and "full" or "compact"
     ns.SpellMeter.MarkDirty()
     ns.Print("Number format: " .. m.numberFormat)
+end
+
+function commands.preset(rest)
+    local key = strtrim(rest or ""):lower()
+    if key == "" or not ns.Theme.PRESETS[key] then
+        ns.Print("Presets (apply with /sm preset <name>, replaces the current style):")
+        for _, k in ipairs(ns.Theme.PRESET_ORDER) do
+            ns.Print(("  %s - %s"):format(k, ns.Theme.PRESETS[k].label))
+        end
+        return
+    end
+    ns.db.profiles[ns.db.activeProfile] = ns.Theme.BuildPreset(key)
+    ns.SpellMeter.ApplyStyle()
+    ns.Print("Applied preset: " .. ns.Theme.PRESETS[key].label)
+end
+
+-- /sm set <path> <value>   e.g. /sm set backdrop.enabled off, /sm set bar.color ff8800cc
+function commands.set(rest)
+    local input, value = (rest or ""):match("^(%S+)%s+(.+)$")
+    if not input then
+        ns.Print("Usage: /sm set <setting> <value>  (list settings with /sm get)")
+        return
+    end
+    local path = ns.Theme.ResolvePath(input)
+    if not path then
+        ns.Print("Not set: unknown setting '" .. input .. "' (see /sm get)")
+        return
+    end
+    local v, err = ns.Theme.ParseValue(path, value)
+    if v == nil then
+        ns.Print("Not set: " .. err)
+        return
+    end
+    ns.Theme.SetPath(ns.Theme.Active(), path, v)
+    ns.SpellMeter.ApplyStyle()
+    ns.Print(path .. " = " .. ns.Theme.FormatValue(ns.Theme.SCHEMA_BY_PATH[path], v))
+end
+
+-- /sm get [prefix]
+function commands.get(rest)
+    local prefix = strtrim(rest or ""):lower()
+    local st = ns.Theme.Active()
+    ns.Print(("Style settings (profile '%s')%s - colors are RRGGBBAA:"):format(
+        ns.db.activeProfile, prefix ~= "" and (" matching '" .. prefix .. "'") or ""))
+    for _, e in ipairs(ns.Theme.SCHEMA) do
+        if prefix == "" or e[1]:lower():sub(1, #prefix) == prefix then
+            local range = (e[2] == "number") and (" [" .. e[3] .. "-" .. e[4] .. "]") or (" (" .. e[2] .. ")")
+            DEFAULT_CHAT_FRAME:AddMessage(("  %s = %s%s"):format(
+                e[1], ns.Theme.FormatValue(e, ns.Theme.GetPath(st, e[1])), range))
+        end
+    end
 end
 
 function commands.bars()
@@ -144,7 +218,8 @@ function commands.bardebug() ns.Diagnostics.BarDebug() end
 SLASH_SOLOMETRICS1 = "/sm"
 SLASH_SOLOMETRICS2 = "/solometrics"
 SlashCmdList["SOLOMETRICS"] = function(msg)
-    local cmd, rest = strtrim(msg or ""):lower():match("^(%S*)%s*(.-)$")
+    local cmd, rest = strtrim(msg or ""):match("^(%S*)%s*(.-)$")
+    cmd = cmd:lower()
     if cmd == "" then
         ns.SpellMeter.Toggle()
     elseif commands[cmd] then

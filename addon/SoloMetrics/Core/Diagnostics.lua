@@ -261,7 +261,7 @@ function D.Probe(args)
     local meterName, meterType = "DamageDone", MT.DamageDone
     local wantID
     for word in (args or ""):gmatch("%S+") do
-        if word == "dps" then
+        if word:lower() == "dps" then
             meterName, meterType = "Dps", MT.Dps
         elseif tonumber(word) then
             wantID = tonumber(word)

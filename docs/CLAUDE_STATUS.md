@@ -1,5 +1,21 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: M2 COMPLETE → M3 phase 1 (style system) deployed as v0.2.0, awaiting in-game test
+
+**M2 exit gate met (user-verified in real combat):** live bars move during combat and stay correct after; chained fights clean; `/sm lock` click-through; `/sm resetui`; both bar modes.
+
+**M3 phase 1 — what changed:**
+- `Appearance/Theme.lua` — style schema (44 settings: path, type, bounds), font/texture/outline registries (styles store keys, never raw paths), `Validate()` (defaults + only valid known values; unknown dropped — reused later for safe import), hex color parsing, presets: `modern`, `minimal` (bars + text only: no backdrop/border/accent/header/icons/bar bg), `textonly`, `compact`.
+- `UI/SpellMeter.lua` — rewritten to render every layer from the active style; alpha applied per region (backdrop alpha never fades text/bars); text columns re-anchor when name/amount/dps toggled; unlocked outline + label so an invisible meter can be found; minimal style is fully invisible when idle and locked.
+- `Core/Bootstrap.lua` — SV schema 3: `profiles` (validated on load) + `activeProfile`; `meter.width` migrated into style. Commands: `/sm preset [name]`, `/sm get [prefix]`, `/sm set <setting> <value>`. Slash args keep case; setting names case-insensitive.
+- Next (phase 2): `/sm config` window with live DEMO preview; profile save/copy/rename/delete; safe export/import.
+
+**Decision requests for ChatGPT:** (1) Review the schema coverage vs. spec 5.2 table — anything missing for phase 1? (2) Spec presets "Graph + Bars" and "Training Focus" deferred until those widgets exist (M5) — OK?
+
+---
+
+## Earlier history
+
 **Date / build:** 2026-11-22 / client 1.60.1.71037, interface 16001
 **Milestone:** M1 exit gate MET (live + post-combat data path confirmed) → **M2 live personal meter: v0.1.0 deployed, awaiting in-game test**
 

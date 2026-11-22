@@ -1,32 +1,30 @@
--- SoloMetrics: SpellMeter (M2 live personal meter)
--- Header: DPS, total damage, session label, timer. Rows: spell icon, name,
--- bar (relative to top spell), damage, DPS - live in combat via opaque
--- passthrough to native setters (D-005). Rows are pooled.
+-- SoloMetrics: SpellMeter (live personal meter, styled)
+-- Every visual layer comes from the active style (Appearance/Theme.lua):
+-- backdrop, border, accent, header, rows, icons, bar fill/background, texts.
+-- Alpha is applied per region (never via the parent frame), so a hidden
+-- backdrop never fades bars or text.
+-- Data path: opaque passthrough of secret values to native setters (D-005).
 
 local _, ns = ...
 local M = {}
 ns.SpellMeter = M
 
-local WHITE = "Interface\\Buttons\\WHITE8X8"
-local HEADER_H = 24
-local ROW_H = 18
-local ROW_GAP = 1
-local ICON = 18
-local PAD = 4
 local THROTTLE = 0.2     -- event-driven: max 5 full renders/sec
 local COMBAT_POLL = 0.1  -- in combat: refresh text 10x/sec; API recomputes DPS
                          -- continuously (observed: DPS ticks down between hits)
 
-local frame, header
+local frame, header, edges, overlay
 local rows = {}
 local dirty = true
 local accum, pollAccum = 0, 0
+local lastRowCount = 0
 
 local function Cfg() return ns.db.meter end
+local function Style() return ns.Theme.Active() end
 
--- Native bar smoothing: the engine animates toward the new value itself, so it
--- works with secret values (no Lua interpolation of protected numbers).
--- Disabled automatically if the client rejects the argument.
+---------------------------------------------------------------------------
+-- Bars: native smoothing (engine-side, works with secret values)
+---------------------------------------------------------------------------
 local smoothing = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
 
 local function SetBarValue(bar, v)
@@ -39,9 +37,7 @@ local function SetBarValue(bar, v)
     bar:SetValue(v)
 end
 
--- Plain SetMinMaxValues: verified to accept secret max in combat (rendertest).
--- An interpolation 3rd argument was tried and caused ranges not to apply in
--- combat (bars then shrank at combat end) - do not reintroduce untested.
+-- Plain SetMinMaxValues: verified to accept a secret max in combat (rendertest).
 local function SetBarRange(bar, maxV)
     bar:SetMinMaxValues(0, maxV)
 end
@@ -63,8 +59,7 @@ local function SetNumber(fs, v)
     end
 end
 
--- Rates (DPS): one decimal via native SetFormattedText (accepts secrets).
--- AbbreviateNumbers leaves small floats at full precision ("5.0270...").
+-- Rates: one decimal via native SetFormattedText (accepts secrets).
 local function SetRate(fs, v)
     if type(v) ~= "number" then
         fs:SetText("-")
@@ -81,53 +76,216 @@ end
 local function ClassColor(classFilename)
     local c = classFilename and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFilename]
     if c then return c.r, c.g, c.b end
-    return 0.31, 0.76, 0.97
+    return nil
 end
 
 ---------------------------------------------------------------------------
--- Frame construction
+-- Style helpers
 ---------------------------------------------------------------------------
-local function NewText(parent, template, justify)
-    local fs = parent:CreateFontString(nil, "OVERLAY", template)
+local function ApplyFont(fs, fontKey, size, outline, shadow, color)
+    local flags = ns.Theme.OUTLINES[outline] or ""
+    fs:SetFont(ns.Theme.FontPath(fontKey), size, flags)
+    if not fs:GetFont() then fs:SetFont(STANDARD_TEXT_FONT, size, flags) end
+    if shadow then
+        fs:SetShadowOffset(1, -1)
+        fs:SetShadowColor(0, 0, 0, 0.9)
+    else
+        fs:SetShadowOffset(0, 0)
+    end
+    if color then fs:SetTextColor(color[1], color[2], color[3], color[4] or 1) end
+end
+
+local function NewText(parent, justify)
+    local fs = parent:CreateFontString(nil, "OVERLAY")
+    fs:SetFont(STANDARD_TEXT_FONT, 11, "")
     fs:SetJustifyH(justify or "LEFT")
     fs:SetWordWrap(false)
     return fs
 end
 
+local function MakeEdges(parent, layer)
+    local e = {}
+    for _, side in ipairs({ "top", "bottom", "left", "right" }) do
+        e[side] = parent:CreateTexture(nil, layer)
+    end
+    return e
+end
+
+local function LayoutEdges(e, parent, size, r, g, b, a, shown)
+    e.top:ClearAllPoints()
+    e.top:SetPoint("TOPLEFT", parent, "TOPLEFT")
+    e.top:SetPoint("TOPRIGHT", parent, "TOPRIGHT")
+    e.top:SetHeight(size)
+    e.bottom:ClearAllPoints()
+    e.bottom:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT")
+    e.bottom:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT")
+    e.bottom:SetHeight(size)
+    e.left:ClearAllPoints()
+    e.left:SetPoint("TOPLEFT", parent, "TOPLEFT")
+    e.left:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT")
+    e.left:SetWidth(size)
+    e.right:ClearAllPoints()
+    e.right:SetPoint("TOPRIGHT", parent, "TOPRIGHT")
+    e.right:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT")
+    e.right:SetWidth(size)
+    for _, t in pairs(e) do
+        t:SetColorTexture(r, g, b, a)
+        t:SetShown(shown)
+    end
+end
+
+---------------------------------------------------------------------------
+-- Layout
+---------------------------------------------------------------------------
+local function HeaderHeight(st)
+    return st.header.enabled and st.header.height or 0
+end
+
+local function RowsTop(st)
+    local hh = HeaderHeight(st)
+    return (hh > 0) and hh or st.padding
+end
+
+local function LayoutRow(r, i, st)
+    local rh, sp, pad = st.rows.height, st.rows.spacing, st.padding
+    local iconW = st.icon.enabled and rh or 0
+    r:ClearAllPoints()
+    r:SetHeight(rh)
+    r:SetPoint("TOPLEFT", frame, "TOPLEFT", pad + (iconW > 0 and iconW + 2 or 0), -(RowsTop(st) + (i - 1) * (rh + sp)))
+    r:SetPoint("RIGHT", frame, "RIGHT", -pad, 0)
+
+    r:SetStatusBarTexture(ns.Theme.TexturePath(st.bar.texture))
+    r.bg:SetShown(st.barBg.enabled)
+    local c = st.barBg.color
+    r.bg:SetColorTexture(c[1], c[2], c[3], c[4])
+
+    r.icon:SetSize(rh, rh)
+    r.icon:SetShown(st.icon.enabled)
+    r.icon:SetAlpha(st.icon.alpha)
+
+    local tx = st.text
+    ApplyFont(r.name, tx.font, tx.size, tx.outline, tx.shadow, tx.name.color)
+    ApplyFont(r.amount, tx.font, tx.size, tx.outline, tx.shadow, tx.amount.color)
+    ApplyFont(r.dps, tx.font, tx.size, tx.outline, tx.shadow, tx.dps.color)
+    r.name:SetShown(tx.name.enabled)
+    r.amount:SetShown(tx.amount.enabled)
+    r.dps:SetShown(tx.dps.enabled)
+
+    r.dps:ClearAllPoints()
+    r.amount:ClearAllPoints()
+    r.name:ClearAllPoints()
+    local anchor, point = r, "RIGHT"
+    if tx.dps.enabled then
+        r.dps:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+        r.dps:SetWidth(tx.columnWidth)
+        anchor, point = r.dps, "LEFT"
+    end
+    if tx.amount.enabled then
+        r.amount:SetPoint("RIGHT", anchor, point, -4, 0)
+        r.amount:SetWidth(tx.columnWidth)
+        anchor, point = r.amount, "LEFT"
+    end
+    r.name:SetPoint("LEFT", r, "LEFT", 4, 0)
+    r.name:SetPoint("RIGHT", anchor, point, -4, 0)
+end
+
 local function CreateRow(i)
     local r = CreateFrame("StatusBar", nil, frame)
-    r:SetHeight(ROW_H)
-    r:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + ICON + 2, -(HEADER_H + (i - 1) * (ROW_H + ROW_GAP)))
-    r:SetPoint("RIGHT", frame, "RIGHT", -PAD, 0)
-    r:SetStatusBarTexture(WHITE)
     r:SetMinMaxValues(0, 1)
     r:SetValue(0)
-
-    local bg = r:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(1, 1, 1, 0.06)
-
+    r.bg = r:CreateTexture(nil, "BACKGROUND")
+    r.bg:SetAllPoints()
     r.icon = r:CreateTexture(nil, "ARTWORK")
-    r.icon:SetSize(ICON, ICON)
     r.icon:SetPoint("RIGHT", r, "LEFT", -2, 0)
     r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-    r.dps = NewText(r, "GameFontHighlightSmall", "RIGHT")
-    r.dps:SetPoint("RIGHT", -4, 0)
-    r.dps:SetWidth(50)
-
-    r.amount = NewText(r, "GameFontHighlightSmall", "RIGHT")
-    r.amount:SetPoint("RIGHT", r.dps, "LEFT", -4, 0)
-    r.amount:SetWidth(46)
-
-    r.name = NewText(r, "GameFontHighlightSmall", "LEFT")
-    r.name:SetPoint("LEFT", 4, 0)
-    r.name:SetPoint("RIGHT", r.amount, "LEFT", -4, 0)
-
+    r.name = NewText(r, "LEFT")
+    r.amount = NewText(r, "RIGHT")
+    r.dps = NewText(r, "RIGHT")
     rows[i] = r
+    LayoutRow(r, i, Style())
     return r
 end
 
+local function LayoutHeader(st)
+    local h = st.header
+    local hh = HeaderHeight(st)
+    local pad = st.padding
+    local labelSize = math.max(6, math.floor(h.size * 0.8 + 0.5))
+
+    ApplyFont(header.dpsLabel, h.font, labelSize, h.outline, false, h.labelColor)
+    ApplyFont(header.totalLabel, h.font, labelSize, h.outline, false, h.labelColor)
+    ApplyFont(header.session, h.font, labelSize, h.outline, false, h.labelColor)
+    ApplyFont(header.dps, h.font, h.size, h.outline, false, h.valueColor)
+    ApplyFont(header.total, h.font, h.size, h.outline, false, h.valueColor)
+    ApplyFont(header.timer, h.font, labelSize, h.outline, false, h.valueColor)
+
+    local y = -hh / 2
+    for _, fs in pairs({ header.dpsLabel, header.dps, header.totalLabel, header.total, header.session, header.timer }) do
+        fs:ClearAllPoints()
+    end
+    local x = pad + 2
+    if h.showDps then
+        header.dpsLabel:SetPoint("LEFT", frame, "TOPLEFT", x, y)
+        header.dps:SetPoint("LEFT", header.dpsLabel, "RIGHT", 4, 0)
+        header.dps:SetWidth(h.size * 4.5)
+    end
+    if h.showTotal then
+        if h.showDps then
+            header.totalLabel:SetPoint("LEFT", header.dps, "RIGHT", 6, 0)
+        else
+            header.totalLabel:SetPoint("LEFT", frame, "TOPLEFT", x, y)
+        end
+        header.total:SetPoint("LEFT", header.totalLabel, "RIGHT", 4, 0)
+        header.total:SetWidth(h.size * 4.5)
+    end
+    header.timer:SetPoint("RIGHT", frame, "TOPRIGHT", -pad - 2, y)
+    if h.showTimer then
+        header.session:SetPoint("RIGHT", header.timer, "LEFT", -6, 0)
+    else
+        header.session:SetPoint("RIGHT", frame, "TOPRIGHT", -pad - 2, y)
+    end
+
+    local on = h.enabled
+    header.dpsLabel:SetShown(on and h.showDps)
+    header.dps:SetShown(on and h.showDps)
+    header.totalLabel:SetShown(on and h.showTotal)
+    header.total:SetShown(on and h.showTotal)
+    header.timer:SetShown(on and h.showTimer)
+    header.session:SetShown(on and h.showSession)
+end
+
+-- Re-applies the whole style. Cheap; called on style change, not per update.
+function M.ApplyStyle()
+    if not frame then return end
+    local st = Style()
+    frame:SetScale(st.scale)
+    frame:SetWidth(st.width)
+
+    local c = st.backdrop.color
+    frame.bg:SetColorTexture(c[1], c[2], c[3], c[4])
+    frame.bg:SetShown(st.backdrop.enabled)
+
+    c = st.border.color
+    LayoutEdges(edges, frame, st.border.size, c[1], c[2], c[3], c[4], st.border.enabled)
+
+    header.accent:SetHeight(st.accent.height)
+    header.accent:SetShown(st.accent.enabled)
+
+    LayoutHeader(st)
+    ApplyFont(header.empty, st.text.font, st.text.size, st.text.outline, st.text.shadow, { 0.6, 0.6, 0.6, 1 })
+    header.empty:ClearAllPoints()
+    header.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", st.padding, -RowsTop(st))
+    header.empty:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -st.padding, -RowsTop(st))
+    header.empty:SetHeight(st.rows.height)
+
+    for i, r in ipairs(rows) do LayoutRow(r, i, st) end
+    M.UpdateOverlay()
+    dirty = true
+end
+
+---------------------------------------------------------------------------
+-- Position, lock, edit overlay
+---------------------------------------------------------------------------
 local function SavePosition()
     local point, _, relPoint, x, y = frame:GetPoint(1)
     Cfg().point = { point, relPoint, x, y }
@@ -143,15 +301,26 @@ local function ApplyPosition()
     end
 end
 
+-- Outline shown while unlocked so an invisible (no-backdrop) meter can be found.
+function M.UpdateOverlay()
+    local show = not Cfg().locked
+    for _, t in pairs(overlay.edges) do t:SetShown(show) end
+    overlay.label:SetShown(show)
+end
+
 local function ApplyLock()
     -- Locked = click-through (no mouse at all). Unlock with /sm edit.
     frame:EnableMouse(not Cfg().locked)
+    M.UpdateOverlay()
+    dirty = true
 end
 
+---------------------------------------------------------------------------
+-- Construction
+---------------------------------------------------------------------------
 local function CreateMeter()
     frame = CreateFrame("Frame", "SoloMetricsMeter", UIParent)
-    frame:SetWidth(Cfg().width)
-    frame:SetHeight(HEADER_H + PAD)
+    frame:SetHeight(40)
     frame:SetFrameStrata("MEDIUM")
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
@@ -167,41 +336,31 @@ local function CreateMeter()
         if button == "RightButton" then M.ToggleSession() end
     end)
 
-    local bg = frame:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.07, 0.07, 0.08, 0.78)
+    frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+    frame.bg:SetAllPoints()
+    edges = MakeEdges(frame, "BORDER")
 
     header = {}
-    local accent = frame:CreateTexture(nil, "BORDER")
-    accent:SetPoint("TOPLEFT")
-    accent:SetPoint("TOPRIGHT")
-    accent:SetHeight(2)
-    header.accent = accent
-
-    local dpsLabel = NewText(frame, "GameFontDisableSmall")
-    dpsLabel:SetPoint("TOPLEFT", PAD + 2, -8)
-    dpsLabel:SetText("DPS")
-    header.dps = NewText(frame, "GameFontHighlight")
-    header.dps:SetPoint("LEFT", dpsLabel, "RIGHT", 4, 0)
-    header.dps:SetWidth(60)
-
-    local totalLabel = NewText(frame, "GameFontDisableSmall")
-    totalLabel:SetPoint("LEFT", dpsLabel, "LEFT", 96, 0)
-    totalLabel:SetText("DMG")
-    header.total = NewText(frame, "GameFontHighlight")
-    header.total:SetPoint("LEFT", totalLabel, "RIGHT", 4, 0)
-    header.total:SetWidth(60)
-
-    header.timer = NewText(frame, "GameFontHighlightSmall", "RIGHT")
-    header.timer:SetPoint("TOPRIGHT", -PAD - 2, -8)
-
-    header.session = NewText(frame, "GameFontDisableSmall", "RIGHT")
-    header.session:SetPoint("RIGHT", header.timer, "LEFT", -6, 0)
-
-    header.empty = NewText(frame, "GameFontDisableSmall", "CENTER")
-    header.empty:SetPoint("TOPLEFT", PAD, -HEADER_H)
-    header.empty:SetPoint("TOPRIGHT", -PAD, -HEADER_H)
+    header.accent = frame:CreateTexture(nil, "ARTWORK")
+    header.accent:SetPoint("TOPLEFT")
+    header.accent:SetPoint("TOPRIGHT")
+    header.dpsLabel = NewText(frame)
+    header.dpsLabel:SetText("DPS")
+    header.dps = NewText(frame)
+    header.totalLabel = NewText(frame)
+    header.totalLabel:SetText("DMG")
+    header.total = NewText(frame)
+    header.timer = NewText(frame, "RIGHT")
+    header.session = NewText(frame, "RIGHT")
+    header.empty = NewText(frame, "CENTER")
     header.empty:SetText("No damage yet")
+
+    overlay = { edges = MakeEdges(frame, "OVERLAY") }
+    LayoutEdges(overlay.edges, frame, 1, 0.31, 0.76, 0.97, 0.7, false)
+    overlay.label = NewText(frame, "LEFT")
+    overlay.label:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 2)
+    overlay.label:SetTextColor(0.31, 0.76, 0.97, 1)
+    overlay.label:SetText("SoloMetrics (unlocked - drag to move, /sm lock when done)")
 
     -- Separate clocks: the 10 Hz text poll must not starve the event-driven
     -- full render (a shared accumulator froze bars for the whole fight).
@@ -221,6 +380,7 @@ local function CreateMeter()
     frame:SetScript("OnShow", function() dirty = true end)
 
     ApplyPosition()
+    M.ApplyStyle()
     ApplyLock()
 end
 
@@ -231,6 +391,8 @@ function M.Render(updateBars)
     if updateBars == nil then updateBars = true end
     if updateBars then dirty = false end
     local cfg = Cfg()
+    local st = Style()
+
     local snap
     if ns.Demo.IsActive() then
         snap = ns.Demo.Snapshot()
@@ -238,8 +400,14 @@ function M.Render(updateBars)
         snap = ns.API.Snapshot(cfg.session)
     end
 
-    local r, g, b = ClassColor(snap.classFilename)
-    header.accent:SetColorTexture(r, g, b, 0.9)
+    local cr, cg, cb = ClassColor(snap.classFilename)
+    local ac = st.accent.color
+    if st.accent.classColor and cr then
+        header.accent:SetColorTexture(cr, cg, cb, ac[4])
+    else
+        header.accent:SetColorTexture(ac[1], ac[2], ac[3], ac[4])
+    end
+
     header.timer:SetText(FormatTime(snap.duration))
     if snap.demo then
         header.session:SetText("|cffff9900DEMO|r")
@@ -248,6 +416,11 @@ function M.Render(updateBars)
     end
     if snap.hasPlayer then SetRate(header.dps, snap.dps) else header.dps:SetText("-") end
     SetNumber(header.total, snap.total)
+
+    local bc = st.bar.color
+    local br, bg, bb = bc[1], bc[2], bc[3]
+    if st.bar.classColor and cr then br, bg, bb = cr, cg, cb end
+    local ba = st.bar.enabled and bc[4] or 0
 
     local n = math.min(snap.spellCount, cfg.maxRows)
     local getTex = C_Spell and C_Spell.GetSpellTexture
@@ -260,7 +433,7 @@ function M.Render(updateBars)
         local row = rows[i] or CreateRow(i)
         local sp = snap.spells[i]
         if type(sp) == "table" then
-            row:SetStatusBarColor(r, g, b, 0.75)
+            row:SetStatusBarColor(br, bg, bb, ba)
             if hasMax and (updateBars or isNew) then
                 -- range first: SetValue clamps to the current range
                 SetBarRange(row, maxV)
@@ -277,16 +450,22 @@ function M.Render(updateBars)
     end
     for i = n + 1, #rows do rows[i]:Hide() end
 
-    header.empty:SetShown(n == 0)
-    local bodyRows = (n > 0) and n or 1
-    frame:SetHeight(HEADER_H + bodyRows * (ROW_H + ROW_GAP) + PAD)
+    -- Empty hint only where something else is visible, so a minimal style is
+    -- truly invisible when idle (the unlocked outline still shows it).
+    local showEmpty = (n == 0) and (st.backdrop.enabled or st.header.enabled or not cfg.locked)
+    header.empty:SetShown(showEmpty)
+
+    if n ~= lastRowCount or updateBars then
+        lastRowCount = n
+        local body = (n > 0) and n * (st.rows.height + st.rows.spacing) or (showEmpty and st.rows.height or 0)
+        frame:SetHeight(math.max(RowsTop(st) + body + st.padding, 8))
+    end
 end
 
 ---------------------------------------------------------------------------
 -- Public controls
 ---------------------------------------------------------------------------
 function M.MarkDirty() dirty = true end
-
 function M.GetRows() return rows end
 
 -- New fight: empty all bars instantly so reused rows don't show stale values.

@@ -112,7 +112,7 @@ function Demo.Toggle(args)
     end
     local length, scale = 30, 1
     for word in (args or ""):gmatch("%S+") do
-        if word == "big" then
+        if word:lower() == "big" then
             scale = 250
         elseif tonumber(word) then
             length = math.max(5, math.min(300, math.floor(tonumber(word))))
