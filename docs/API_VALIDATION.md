@@ -107,6 +107,10 @@ All OBSERVED 2026-11-22 (`/sm rendertest`, 11 in-combat ticks, 0 errors each). "
 | `StatusBar:SetValue(secret spell.totalAmount)` | yes |
 | `FontString:SetText(spell.totalAmount)` | yes |
 
+## Bar smoothing (OBSERVED 2026-11-22)
+
+`Enum.StatusBarInterpolation` = Immediate=0, ExponentialEaseOut=1. `StatusBar:SetValue(secret, ExponentialEaseOut)` animates visibly in combat (user confirmed), provided the value is not re-set every poll tick. Perceived jerkiness at low level comes from coarse native update cadence + small damage numbers, not the renderer.
+
 ## Data semantics (OBSERVED post-combat, Hunter, no pet, 4s fight)
 
 - `combatSpells` arrive **sorted by totalAmount descending** → live rows need no Lua sort.
