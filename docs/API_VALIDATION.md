@@ -124,6 +124,10 @@ Source `amountPerSecond` is recomputed at query time: polling during combat show
 - `/sm graphtest` (OBSERVED 2026-11-22, 8 in-combat samples, scale 0-30): vertical `StatusBar:SetMinMaxValues/SetValue(secret dps)` ok=8 err=0; `Line:SetStartPoint/SetEndPoint` anchored to fill-texture TOP ok=28 err=0. **User visually confirmed: columns populated live in combat with dot + line following the column tops.** → live opaque graphing is SUPPORTED (no Lua access to values).
 - `DAMAGE_METER_COMBAT_SESSION_UPDATED` payload (OBSERVED, readable in combat): `(meterType, sessionID)` — e.g. `0,163` / `1,163` / `10,163` (DamageDone / Dps / EnemyDamageTaken for session 163) and `0,0` / `1,0` (sessionID 0 — most likely the Overall session; INFERRED). Fired 40× in an 8 s fight, once per meter type per update.
 
+## Counter formatting in combat (OBSERVED 2026-11-22, v0.9.0)
+
+`FontString:SetFormattedText("%.2f", secret)`, `SetFormattedText("Total: %.0f", secret)` and `SetText(BreakUpLargeNumbers(secret))` all render live in combat without errors (user-verified via counter widgets).
+
 ## Data semantics (OBSERVED post-combat, Hunter, no pet, 4s fight)
 
 - `combatSpells` arrive **sorted by totalAmount descending** → live rows need no Lua sort.
