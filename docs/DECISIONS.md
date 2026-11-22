@@ -23,5 +23,8 @@ Agreed with ChatGPT review; user requirement: live in-combat DPS is mandatory. E
 ## D-006 — Config UI design locked (2026-11-22)
 Per `CONFIG_UI_DESIGN.md` (ChatGPT, approved): left nav + right pane + search; instant apply with per-setting/category reset and session revert; native color picker + hex RGBA; all 44 schema settings bound in v1 with Advanced sections. Implementation choices: custom flat widgets (no UIDropDownMenu, to avoid taint); UI metadata in a separate registry rather than inside the style schema, so the schema stays pure data for validation/import; window strata HIGH so the native ColorPickerFrame appears above it.
 
+## D-007 — Custom themed color picker instead of native ColorPickerFrame (2026-11-22)
+Supersedes the "native picker" part of D-006 / CONFIG_UI_DESIGN decision 3, at the user's request: the Blizzard picker looked out of place against the flat theme (screenshot). Replacement (`Settings/Widgets.lua`): HSV square, hue strip, opacity strip over a checkerboard, New/Original swatches (click Original to restore), `#RRGGBBAA` hex input with validation, OK/Cancel. Live preview while dragging. Any close other than OK (Cancel, Escape, closing the settings window) restores the exact original RGBA — keeps acceptance test 5 semantics.
+
 ## D-004 — Lua safety lint (2026-11-22)
 `Validate-SoloMetrics.ps1` fails on combat-log event usage, `loadstring`/`RunScript`, and any `ResetAllCombatSessions` reference lacking an `SM-ALLOW-RESET` review marker.
