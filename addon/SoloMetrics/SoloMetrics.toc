@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: SoloMetrics
+## Notes: Personal solo damage meter for WoW: Forever (M0 scaffold)
+## Version: 0.0.1
+## SavedVariables: SoloMetricsDB
+## Category: Combat
+
+Core\Bootstrap.lua
+Core\Diagnostics.lua
