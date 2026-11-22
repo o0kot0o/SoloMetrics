@@ -184,6 +184,13 @@ R.CATEGORIES = {
         },
     },
     {
+        id = "widgets", label = "Widgets",
+        items = {
+            { kind = "note", text = "Graph widgets are independent windows with their own data, size, position and appearance. Click Edit to open a widget's own settings window. Live graphs show the game's running values (average DPS so far, total damage) sampled over a fixed time window." },
+            { kind = "widgetlist" },
+        },
+    },
+    {
         id = "profiles", label = "Profiles",
         items = {
             { kind = "note", text = "A profile is a complete saved appearance. Switch between them any time; meter behaviour (General) is shared." },

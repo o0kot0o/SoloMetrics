@@ -1,5 +1,16 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: W4 — per-widget settings windows (v0.7.0) — awaiting in-game test
+
+User request: each widget's options open in a **separate window containing only that widget's settings**; the main config lists widgets with buttons to open them.
+- `Settings/Panel.lua` (new) — the control-row system extracted from ConfigWindow into a reusable scrolling panel (toggle / slider+input / dropdown with previews / color swatch+hex / section / note / buttons / custom rows, pooling, tooltips, per-setting reset, dependency dimming, Advanced toggle). New `custom` item kind with get/set/default/reset/depFn/isCustom.
+- `Settings/ConfigWindow.lua` — now a shell over Panel; new **Widgets** page: create buttons (Average DPS / Total damage), Move/Lock all, one row per widget with Edit / Show-Hide / Delete.
+- `Settings/WidgetWindow.lua` (new) — one window per widget (several can be open): Data, Graph (style, samples, interval, scale mode, fixed max), Behaviour, Position & size, Window, Title & value, Fill, Line & points, Axis & grid. Appearance controls edit overrides only; R clears the override (teal dot = customized). Footer: Rename, Duplicate, Lock/Unlock, Delete, Copy appearance from…, Use as default for new widgets, Reset appearance.
+- WidgetManager keeps open windows and the list in sync; metric/session change clears the graph; `ResetPosition`, `ResetGraph`, `ApplyAll` public.
+- Also in this build: "focus" scale mode (50–150 % of last fight's readable result).
+
+---
+
 ## UPDATE 2026-11-22: Widget Engine W2 + core W3 — v0.6.0 deployed, awaiting in-game test
 
 **graphtest result:** 0 errors and **user-confirmed visually** — live opaque graphs work (columns + dots + line follow secret values in combat). Event payload decoded: `(meterType, sessionID)`.

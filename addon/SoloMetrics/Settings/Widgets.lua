@@ -277,6 +277,8 @@ local function ParseHex(s)
         tonumber(s:sub(5, 6), 16) / 255, (#s == 8) and (tonumber(s:sub(7, 8), 16) / 255) or 1
 end
 
+W.ParseHex = ParseHex
+
 local function ToHex(r, g, b, a)
     local function c(x) return math.floor(math.max(0, math.min(1, x)) * 255 + 0.5) end
     return ("#%02x%02x%02x%02x"):format(c(r), c(g), c(b), c(a))

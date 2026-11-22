@@ -200,6 +200,9 @@ function WM.Apply(id)
     f.renderer:SetScale(EffectiveRange(w))
     ApplyMouse(f, w)
     f:SetShown(ShouldShow(w))
+    -- keep open settings UIs in sync (they only refresh, never re-apply)
+    if ns.WidgetWindow then ns.WidgetWindow.Refresh(id) end
+    if ns.Config and ns.Config.RefreshWidgets then ns.Config.RefreshWidgets(false) end
 end
 
 function WM.UpdateTitle(id)
@@ -212,6 +215,7 @@ end
 local function ApplyAll()
     for _, id in ipairs(DB().order) do WM.Apply(id) end
 end
+WM.ApplyAll = ApplyAll
 
 local function UpdateVisibility()
     for _, id in ipairs(DB().order) do
@@ -322,6 +326,7 @@ function WM.Create(opts)
     DB().byId[id] = w
     table.insert(DB().order, id)
     WM.Apply(id)
+    if ns.Config and ns.Config.RefreshWidgets then ns.Config.RefreshWidgets(true) end
     return id
 end
 
@@ -341,6 +346,7 @@ function WM.Duplicate(id)
     DB().byId[nid] = w
     table.insert(DB().order, nid)
     WM.Apply(nid)
+    if ns.Config and ns.Config.RefreshWidgets then ns.Config.RefreshWidgets(true) end
     return nid
 end
 
@@ -354,9 +360,24 @@ function WM.Delete(id)
     if f then
         f:Hide()
         f:SetScript("OnUpdate", nil)
-        frames[id] = nil -- frame is recycled by nobody; it stays hidden (WoW frames can't be destroyed)
+        frames[id] = nil -- WoW frames can't be destroyed; it stays hidden
     end
+    if ns.WidgetWindow then ns.WidgetWindow.Close(id) end
+    if ns.Config and ns.Config.RefreshWidgets then ns.Config.RefreshWidgets(true) end
     return true
+end
+
+-- Clears a widget's samples (after its metric/session changed).
+function WM.ResetGraph(id)
+    ResetWidgets(function(x) return x.id == id end)
+end
+
+function WM.ResetPosition(id)
+    local w = Rec(id)
+    if not w then return end
+    local p = DefaultPosition()
+    w.position.x, w.position.y = p.x, p.y
+    WM.Apply(id)
 end
 
 function WM.SetEditAll(on)
