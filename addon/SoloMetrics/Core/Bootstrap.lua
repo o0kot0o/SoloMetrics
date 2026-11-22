@@ -105,6 +105,9 @@ function commands.help()
     ns.Print("v" .. ns.VERSION .. " commands:")
     ns.Print("  /sm - show/hide the meter frame")
     ns.Print("  /sm debug - client build + C_DamageMeter capability probe")
+    ns.Print("  /sm probe [dps] [sessionID] - dump session/source/spell data shapes")
+    ns.Print("  /sm watch - toggle secret/readable field report around each fight")
+    ns.Print("  /sm copy - copyable window with the last report")
     ns.Print("  /sm resetui - re-center and show frames (does not touch combat data)")
     ns.Print("  /sm version - print version and load count")
 end
@@ -115,6 +118,18 @@ end
 
 function commands.debug()
     ns.Diagnostics.Run()
+end
+
+function commands.probe(rest)
+    ns.Diagnostics.Probe(rest)
+end
+
+function commands.watch()
+    ns.Diagnostics.ToggleWatch()
+end
+
+function commands.copy()
+    ns.Diagnostics.ShowCopy()
 end
 
 function commands.resetui()
@@ -128,11 +143,11 @@ end
 SLASH_SOLOMETRICS1 = "/sm"
 SLASH_SOLOMETRICS2 = "/solometrics"
 SlashCmdList["SOLOMETRICS"] = function(msg)
-    local cmd = strtrim(msg or ""):lower():match("^(%S*)")
+    local cmd, rest = strtrim(msg or ""):lower():match("^(%S*)%s*(.-)$")
     if cmd == "" then
         ToggleStatusFrame()
     elseif commands[cmd] then
-        commands[cmd]()
+        commands[cmd](rest)
     elseif PLANNED[cmd] then
         ns.Print("/sm " .. cmd .. " is not implemented yet (planned for " .. PLANNED[cmd] .. ").")
     else

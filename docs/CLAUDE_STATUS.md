@@ -1,39 +1,38 @@
 # SoloMetrics — Claude Status
 
-**Date / build:** 2026-11-22 / client 1.60.1.71037 (from install files; not yet confirmed in game)
-**Milestone / commit:** M0 — project & deployment scaffold (initial commit)
+**Date / build:** 2026-11-22 / client 1.60.1.71037, interface 16001 (OBSERVED via `GetBuildInfo`)
+**Milestone:** M0 complete (addon loads in game) → M1 API feasibility spike in progress
 
-**What changed (files):**
-- `addon/SoloMetrics/SoloMetrics.toc` — interface 16001, SavedVariables `SoloMetricsDB`
-- `addon/SoloMetrics/Core/Bootstrap.lua` — SV init with load counter, slash commands, small movable status frame
-- `addon/SoloMetrics/Core/Diagnostics.lua` — `/sm debug`: build info, `C_DamageMeter` function presence, `*DamageMeter*` enums; out of combat only: `IsDamageMeterAvailable()` and session list shape (secret values shown as `<secret>`)
-- `scripts/Validate-SoloMetrics.ps1`, `scripts/Deploy-SoloMetrics.ps1`, `deploy.cmd`
-- `docs/API_VALIDATION.md`, `docs/FEATURE_MATRIX.md`, `docs/DECISIONS.md`, this file
-- `README.md`, `CHANGELOG.md`, `CLAUDE.md`, `.gitignore`, `dev.local.example.json`
+## M0 result
+- Addon loads from `_forever_\Interface\AddOns\SoloMetrics`; `/sm debug` works. OBSERVED.
+- Deploy workflow verified: validate → copy (manifest + SHA-256 verify) → game. Safety gates tested against fake folders (root, `_retail_`, unknown client, wrong parent, project root, foreign existing folder all refused; stale-file removal only touches manifest entries).
+- SavedVariables load counter reached 2 → persistence works at least once (reload vs restart not yet distinguished).
 
-**Deployment path used:** `<WoW>\_forever_\Interface\AddOns\SoloMetrics`
+## M1 evidence so far (all OBSERVED, out of combat)
+- All 8 documented `C_DamageMeter` functions present, no extra members. `issecretvalue` present.
+- Enums are richer than docs: `DamageMeterType` has 11 meter types (DamageDone=0, Dps=1, …); `DamageMeterSessionType` = Overall=0, Current=1, Expired=2; also `DamageMeterOverrideType.RedirectSourceToOwner` (pet attribution hint). Full list in `docs/API_VALIDATION.md`.
+- `IsDamageMeterAvailable()` → `true, ""`.
+- `GetAvailableCombatSessions()` → rolling FIFO window of 30 `{sessionID, name, durationSeconds}` entries, oldest first; readable right after a fight.
 
-**Commands to reproduce:**
-```
-deploy.cmd -DryRun
-deploy.cmd
-```
-then restart WoW (first install), enable SoloMetrics, and in game: `/sm help`, `/sm debug`, `/sm version`.
+## What changed in this step (files)
+- `addon/SoloMetrics/Core/Diagnostics.lua` — new commands:
+  - `/sm probe [dps] [sessionID]`: recursive shape dump of `GetCombatSessionFromType(Current)`, `GetCombatSessionSourceFromType(Current, player GUID)`, and (out of combat) `FromID`/`SourceFromID` for the latest session. In combat prints types/secret flags only. GUIDs and player name redacted.
+  - `/sm watch`: on combat start, +3s, and combat end +0/+0.5/+2/+5s, prints which fields are Secret/Readable (never values) and counts `DAMAGE_METER_*` events with payload secret-status.
+  - `/sm copy`: copyable text window of the last report.
+- `addon/SoloMetrics/Core/Bootstrap.lua` — slash routing passes arguments; new commands in help.
+- TOC unchanged (so `/reload` suffices).
 
-**Tests actually executed / outcomes:**
-- Static validation: PASSED (2 TOC entries, 2 Lua files scanned; no luac, so no syntax check).
-- Deploy safety gates, tested against fake folders in a temp dir: filesystem root refused; `_retail_` refused; unknown client `_forever2_` refused; parent not `Interface\AddOns` refused; project root as target refused; first deploy 3 NEW; redeploy 3 UNCHANGED; manifest-tracked stale file removed while untracked user file was kept; existing folder without manifest refused. All exit codes correct.
-- Real deploy to `_forever_\Interface\AddOns\SoloMetrics`: DEPLOY SUCCESS, 3 files hash-verified.
-- In-game: **none yet.**
+## Tests actually executed
+- Static validation PASSED; deploy SUCCESS (2 updated). New commands **not yet run in game**.
 
-**Client API evidence:** none observed in game yet. All entries UNTESTED.
+## Known limitations
+- No luac locally; Lua syntax only verified by loading in game.
+- `/sm watch` timers can overlap if a new fight starts <5s after the previous ends (diagnostic only).
 
-**Known bugs and limitations:**
-- No luac available locally, so Lua syntax is only checked by loading in game.
-- Status frame is a placeholder; real widgets come in M2/M3.
+## Decision requests for ChatGPT
+1. Is `GetCombatSessionSourceFromType(sessionType, meterType, UnitGUID("player"))` the right way to isolate the player, or should we iterate `combatSources` from the session and match a flag (e.g. `isLocalPlayer`)? Probe output will show available fields.
+2. `DamageMeterOverrideType.RedirectSourceToOwner` — any documentation on whether pet damage is merged into the owner's source by default?
+3. Should the meter use `DamageDone` (0) or `Dps` (1) meter type for the DPS column, or is `amountPerSecond` within DamageDone sufficient?
 
-**Decision requests for ChatGPT:**
-1. Review the deploy safety gates in `scripts/Deploy-SoloMetrics.ps1` (manifest approach, D-001) — anything missing?
-2. For M1: which exact call sequence should identify the player's own source (`sourceGUID = UnitGUID("player")` vs. iterating session sources)?
-
-**Next proposed step:** user runs first deploy + game restart, pastes `/sm debug` output (out of combat, then once after a fight). That fills API_VALIDATION and starts M1.
+## Next proposed step
+User runs `/reload`, then: `/sm probe` out of combat; `/sm watch`, one fight, wait ~5s; paste both (via `/sm copy`). That determines live-display vs post-combat readability and the spell row shape → exit M1.
