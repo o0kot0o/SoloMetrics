@@ -32,9 +32,9 @@ No undocumented members on `C_DamageMeter` (OBSERVED).
 
 | Event | Fires? | Payload | When |
 | --- | --- | --- | --- |
-| `DAMAGE_METER_COMBAT_SESSION_UPDATED` | UNTESTED | | |
-| `DAMAGE_METER_CURRENT_SESSION_UPDATED` | UNTESTED | | |
-| `DAMAGE_METER_RESET` | UNTESTED | | |
+| `DAMAGE_METER_COMBAT_SESSION_UPDATED` | yes, 56× in one short solo fight | 2 args, both readable numbers in combat (meaning UNTESTED; likely meterType + sessionID) | throughout combat |
+| `DAMAGE_METER_CURRENT_SESSION_UPDATED` | yes, 1× | no args | at combat start (new Current session) |
+| `DAMAGE_METER_RESET` | not fired | | |
 
 ## Enums (OBSERVED 2026-11-22, build 71037)
 
@@ -54,17 +54,38 @@ No undocumented members on `C_DamageMeter` (OBSERVED).
 
 Notes (inferred, not verified): `OverrideType.RedirectSourceToOwner` suggests the native meter may already fold pet/guardian damage into the owner for some spells — relevant to double-count prevention (M4). Each enum also has a `*Meta` table (MinValue/MaxValue/NumValues).
 
-## Fields (per session / source / spell)
+## Data shape (OBSERVED 2026-11-22 via `/sm watch`, DamageDone meter, Current session)
 
-| Field | Out of combat | In combat | After combat (delay?) |
-| --- | --- | --- | --- |
-| session list `sessionID`, `name`, `durationSeconds` | readable | UNTESTED | — |
-| source name | UNTESTED | UNTESTED | UNTESTED |
-| source totalAmount | UNTESTED | UNTESTED | UNTESTED |
-| source amountPerSecond | UNTESTED | UNTESTED | UNTESTED |
-| spell spellID | UNTESTED | UNTESTED | UNTESTED |
-| spell totalAmount | UNTESTED | UNTESTED | UNTESTED |
-| spell amountPerSecond | UNTESTED | UNTESTED | UNTESTED |
+```
+GetCombatSessionFromType(Current, DamageDone) ->
+  { durationSeconds, maxAmount, totalAmount,
+    combatSources = [ { amountPerSecond, classFilename, classification, deathRecapID,
+                        deathTimeSeconds, isLocalPlayer, name, sourceDisplayType,
+                        sourceGUID, specIconID, totalAmount } ] }
+GetCombatSessionSourceFromType(Current, DamageDone, UnitGUID("player")) ->
+  { maxAmount, totalAmount,
+    combatSpells = [ { amountPerSecond, combatSpellDetails = [], creatureName, isAvoidable,
+                       isDeadly, overkillAmount, spellID, totalAmount } ] }
+```
+
+Solo fight: `combatSources` had 1 entry. `combatSpells` grew 2 (at +3s) → 6 (end). `combatSpellDetails` was empty.
+
+## Fields: secret status (S = secret, R = readable)
+
+`PLAYER_REGEN_DISABLED` fires before combat lockdown: at that instant a fresh empty Current session exists and fields are R.
+
+| Field | In combat (+3s) | Combat end +0s / +0.5s / +2s / +5s |
+| --- | --- | --- |
+| `GetSessionDurationSeconds(Current)` | **R** (number) | R |
+| session `durationSeconds`, `totalAmount`, `maxAmount` | S | R |
+| `#combatSources`, `#combatSpells` (array length) | **R** | R |
+| source `isLocalPlayer`, `classFilename`, `classification`, `deathRecapID` | **R** | R |
+| source `name`, `sourceGUID`, `totalAmount`, `amountPerSecond`, `sourceDisplayType`, `deathTimeSeconds` | S | R |
+| source `specIconID` | S | **S (stays secret)** |
+| playerSource `totalAmount`, `maxAmount` | S | R |
+| spell `spellID`, `totalAmount`, `amountPerSecond`, `overkillAmount`, `creatureName`, `isAvoidable`, `isDeadly` | S (incl. spellID!) | R |
+
+**No settle delay observed:** everything (except specIconID) readable already at combat end +0s, i.e. inside the `PLAYER_REGEN_ENABLED` handler.
 
 ## Secret-value rendering paths
 
@@ -76,4 +97,5 @@ Notes (inferred, not verified): `OverrideType.RedirectSourceToOwner` suggests th
 ## Log
 
 - **2026-11-22, build 71037** — `/sm debug` out of combat after several Webwood Spider fights. All 8 functions present; enums above; `IsDamageMeterAvailable() → true, ""`; 30 sessions listed (IDs 59, 60, 61… with mob names and durations). Source: OBSERVED (user paste).
+- **2026-11-22, build 71037** — `/sm watch` over one solo fight: secret-status table and events above. Source: OBSERVED.
 - **2026-11-22, build 71037** — `/sm debug` again after one fight (Githyiss the Vile, 6s). List still #30: first entry now ID 60, new ID 62 at end → FIFO cap of 30 sessions; new fight readable in list out of combat. Source: OBSERVED.

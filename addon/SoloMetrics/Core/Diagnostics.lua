@@ -432,6 +432,270 @@ function D.ToggleWatch()
 end
 
 ---------------------------------------------------------------------------
+-- /sm rendertest: can native display setters accept secret values?
+-- Each in-combat call is attempted through pcall purely to detect whether the
+-- documented setter accepts the value; nothing is computed from secrets and
+-- no secret is retained beyond the update call. After combat (data readable)
+-- a correctness report checks sorting, sums and pet attribution.
+---------------------------------------------------------------------------
+local RT = { results = {}, order = {}, active = false, elapsed = 0, hadCombat = false }
+
+local function RTRecord(name, ok, err)
+    local r = RT.results[name]
+    if not r then
+        r = { ok = 0, err = 0 }
+        RT.results[name] = r
+        RT.order[#RT.order + 1] = name
+    end
+    if ok then
+        r.ok = r.ok + 1
+    else
+        r.err = r.err + 1
+        r.lastErr = tostring(err):sub(1, 160)
+    end
+end
+
+local function RTCreate()
+    local f = CreateFrame("Frame", "SoloMetricsRenderTest", UIParent)
+    f:SetSize(320, 152)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, -160)
+    f:SetClampedToScreen(true)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.08, 0.08, 0.09, 0.85)
+
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    title:SetPoint("TOPLEFT", 10, -8)
+    title:SetText("SoloMetrics RENDER TEST (diagnostic)")
+
+    local function row(y, label)
+        local l = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        l:SetPoint("TOPLEFT", 10, y)
+        l:SetText(label)
+        local v = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        v:SetPoint("TOPLEFT", 120, y)
+        v:SetText("-")
+        return v
+    end
+    f.timer = row(-26, "Timer (readable)")
+    f.total = row(-42, "Total raw")
+    f.totalAbbr = row(-58, "Total abbreviated")
+    f.dps = row(-74, "DPS raw")
+    f.dpsFmt = row(-90, "DPS formatted")
+    f.spellCount = row(-106, "# spells")
+
+    f.icon = f:CreateTexture(nil, "ARTWORK")
+    f.icon:SetSize(18, 18)
+    f.icon:SetPoint("TOPLEFT", 10, -126)
+    f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local bar = CreateFrame("StatusBar", nil, f)
+    bar:SetPoint("LEFT", f.icon, "RIGHT", 4, 0)
+    bar:SetSize(280, 18)
+    bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+    bar:SetStatusBarColor(0.31, 0.76, 0.97, 0.8)
+    bar:SetMinMaxValues(0, 1)
+    bar:SetValue(0)
+    local barBg = bar:CreateTexture(nil, "BACKGROUND")
+    barBg:SetAllPoints()
+    barBg:SetColorTexture(1, 1, 1, 0.08)
+    f.bar = bar
+    f.spellName = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.spellName:SetPoint("LEFT", 4, 0)
+    f.spellName:SetText("spell 1")
+    f.spellAmt = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.spellAmt:SetPoint("RIGHT", -4, 0)
+    f.spellAmt:SetText("-")
+
+    f:Hide()
+    return f
+end
+
+local function RTUpdate()
+    local f = RT.frame
+    local dm = C_DamageMeter
+    local MT, ST = MeterEnums()
+    if not MT or type(dm) ~= "table" then return end
+    local counting = InCombat()
+    if counting then RT.hadCombat = true end
+
+    local function T(name, fn, ...)
+        if type(fn) ~= "function" then
+            if counting then RTRecord(name, false, "function missing") end
+            return false
+        end
+        local ok, a = pcall(fn, ...)
+        if counting then RTRecord(name, ok, a) end
+        return ok, a
+    end
+
+    local okD, dur = pcall(dm.GetSessionDurationSeconds, ST.Current)
+    if okD and not IsSecret(dur) and type(dur) == "number" then
+        f.timer:SetText(("%.0fs"):format(dur))
+    end
+
+    local okS, session = pcall(dm.GetCombatSessionFromType, ST.Current, MT.DamageDone)
+    local me
+    if okS and type(session) == "table" and not IsSecret(session) and type(session.combatSources) == "table" then
+        local list = session.combatSources
+        for i = 1, #list do
+            local s = list[i]
+            if type(s) == "table" and not IsSecret(s.isLocalPlayer) and s.isLocalPlayer == true then
+                me = s
+                break
+            end
+        end
+    end
+    if me then
+        T("FontString:SetText(source.totalAmount)", f.total.SetText, f.total, me.totalAmount)
+        T("AbbreviateNumbers(totalAmount) -> SetText", function()
+            f.totalAbbr:SetText(AbbreviateNumbers(me.totalAmount))
+        end)
+        T("BreakUpLargeNumbers(totalAmount)", BreakUpLargeNumbers, me.totalAmount)
+        T("FontString:SetText(source.amountPerSecond)", f.dps.SetText, f.dps, me.amountPerSecond)
+        T("FontString:SetFormattedText('%.1f', amountPerSecond)", f.dpsFmt.SetFormattedText, f.dpsFmt, "%.1f", me.amountPerSecond)
+        T("string.format('%.1f', amountPerSecond)", string.format, "%.1f", me.amountPerSecond)
+    end
+
+    local okP, src = pcall(dm.GetCombatSessionSourceFromType, ST.Current, MT.DamageDone, UnitGUID("player"))
+    if okP and type(src) == "table" and not IsSecret(src) and type(src.combatSpells) == "table" then
+        local spells = src.combatSpells
+        f.spellCount:SetText(tostring(#spells))
+        local sp = spells[1]
+        if type(sp) == "table" and not IsSecret(sp) then
+            local getTex = C_Spell and C_Spell.GetSpellTexture
+            local getName = C_Spell and C_Spell.GetSpellName
+            local okT, tex = T("C_Spell.GetSpellTexture(spellID)", getTex, sp.spellID)
+            if okT then T("Texture:SetTexture(texture result)", f.icon.SetTexture, f.icon, tex) end
+            local okN, name = T("C_Spell.GetSpellName(spellID)", getName, sp.spellID)
+            if okN then T("FontString:SetText(name result)", f.spellName.SetText, f.spellName, name) end
+            T("StatusBar:SetMinMaxValues(0, source.maxAmount)", f.bar.SetMinMaxValues, f.bar, 0, src.maxAmount)
+            T("StatusBar:SetValue(spell.totalAmount)", f.bar.SetValue, f.bar, sp.totalAmount)
+            T("FontString:SetText(spell.totalAmount)", f.spellAmt.SetText, f.spellAmt, sp.totalAmount)
+        end
+    end
+end
+
+-- Returns v only if readable; otherwise nil.
+local function R(v)
+    if IsSecret(v) then return nil end
+    return v
+end
+
+local function RTCorrectness(out)
+    local dm = C_DamageMeter
+    local MT, ST = MeterEnums()
+    local okS, session = pcall(dm.GetCombatSessionFromType, ST.Current, MT.DamageDone)
+    local okP, src = pcall(dm.GetCombatSessionSourceFromType, ST.Current, MT.DamageDone, UnitGUID("player"))
+    if not (okS and okP and type(session) == "table" and type(src) == "table") then
+        out("Correctness: session/source query failed")
+        return
+    end
+    local me
+    for i = 1, #(session.combatSources or {}) do
+        local s = session.combatSources[i]
+        if type(s) == "table" and R(s.isLocalPlayer) == true then me = s break end
+    end
+    local sTotal, sDur, sMax = R(session.totalAmount), R(session.durationSeconds), R(session.maxAmount)
+    local pTotal, pMax = R(src.totalAmount), R(src.maxAmount)
+    if not (me and sTotal and sDur and pTotal and pMax) then
+        out("Correctness: some fields still secret or player source missing - skipped")
+        return
+    end
+    local meTotal, meDps = R(me.totalAmount), R(me.amountPerSecond)
+    out(("Sources in session: %d; session total=%s duration=%s max=%s"):format(
+        #session.combatSources, tostring(sTotal), tostring(sDur), tostring(sMax)))
+    out(("Player source: total=%s apiDPS=%s; playerSource total=%s max=%s"):format(
+        tostring(meTotal), tostring(meDps), tostring(pTotal), tostring(pMax)))
+    if meTotal and meDps and sDur and sDur > 0 then
+        out(("apiDPS / (total / session duration) = %.3f"):format(meDps / (meTotal / sDur)))
+    end
+    out("session.total == player source total: " .. tostring(sTotal == meTotal))
+    out("playerSource.total == player source total: " .. tostring(pTotal == meTotal))
+
+    local spells = src.combatSpells or {}
+    local sum, sorted, anyCreature = 0, true, 0
+    local prev
+    for i = 1, #spells do
+        local sp = spells[i]
+        local amt = R(sp.totalAmount)
+        if amt then
+            sum = sum + amt
+            if prev and prev < amt then sorted = false end
+            prev = amt
+        end
+        local cn = R(sp.creatureName)
+        if type(cn) == "string" and cn ~= "" then anyCreature = anyCreature + 1 end
+    end
+    out(("#spells=%d, sorted by totalAmount desc: %s, sum=%s (== playerSource.total: %s)"):format(
+        #spells, tostring(sorted), tostring(sum), tostring(sum == pTotal)))
+    out("playerSource.maxAmount == spells[1].totalAmount: " .. tostring(spells[1] and R(spells[1].totalAmount) == pMax))
+    out("spells with creatureName set (pet/guardian?): " .. anyCreature)
+    local getName = C_Spell and C_Spell.GetSpellName
+    for i = 1, math.min(#spells, 12) do
+        local sp = spells[i]
+        local id = R(sp.spellID)
+        local name = (id and getName and getName(id)) or "?"
+        out(("  %d. id=%s %s total=%s aps=%s overkill=%s creature=%s details#%d"):format(
+            i, tostring(id), tostring(name), tostring(R(sp.totalAmount)), tostring(R(sp.amountPerSecond)),
+            tostring(R(sp.overkillAmount)), tostring(R(sp.creatureName)),
+            type(sp.combatSpellDetails) == "table" and #sp.combatSpellDetails or -1))
+    end
+end
+
+local function RTReport()
+    local r = NewReport("render test: in-combat secret rendering + post-combat correctness")
+    r.out("In-combat native calls (ok / err counts):")
+    if #RT.order == 0 then r.out("  (no in-combat attempts recorded)") end
+    for _, name in ipairs(RT.order) do
+        local x = RT.results[name]
+        r.out(("  %s: ok=%d err=%d%s"):format(name, x.ok, x.err, x.lastErr and ("  last error: " .. x.lastErr) or ""))
+    end
+    RTCorrectness(r.out)
+    r.finish(true)
+    RT.results, RT.order, RT.hadCombat = {}, {}, false
+end
+
+local rtEvents = CreateFrame("Frame")
+rtEvents:SetScript("OnEvent", function()
+    if RT.active and RT.hadCombat then
+        C_Timer.After(0.3, function()
+            RTUpdate() -- one readable refresh so the panel shows final values
+            RTReport()
+        end)
+    end
+end)
+
+function D.ToggleRenderTest()
+    RT.frame = RT.frame or RTCreate()
+    RT.active = not RT.active
+    if RT.active then
+        RT.results, RT.order, RT.hadCombat = {}, {}, false
+        RT.frame:Show()
+        RT.frame:SetScript("OnUpdate", function(_, elapsed)
+            RT.elapsed = RT.elapsed + elapsed
+            if RT.elapsed >= 0.25 then
+                RT.elapsed = 0
+                RTUpdate()
+            end
+        end)
+        rtEvents:RegisterEvent("PLAYER_REGEN_ENABLED")
+        ns.Print("Render test ON: fight something and WATCH the panel during combat. Report prints after combat.")
+    else
+        RT.frame:SetScript("OnUpdate", nil)
+        RT.frame:Hide()
+        rtEvents:UnregisterAllEvents()
+        ns.Print("Render test OFF.")
+    end
+end
+
+---------------------------------------------------------------------------
 -- /sm copy: copyable text window
 ---------------------------------------------------------------------------
 local copyFrame

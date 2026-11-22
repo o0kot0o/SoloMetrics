@@ -107,6 +107,7 @@ function commands.help()
     ns.Print("  /sm debug - client build + C_DamageMeter capability probe")
     ns.Print("  /sm probe [dps] [sessionID] - dump session/source/spell data shapes")
     ns.Print("  /sm watch - toggle secret/readable field report around each fight")
+    ns.Print("  /sm rendertest - toggle live secret-rendering test panel")
     ns.Print("  /sm copy - copyable window with the last report")
     ns.Print("  /sm resetui - re-center and show frames (does not touch combat data)")
     ns.Print("  /sm version - print version and load count")
@@ -126,6 +127,10 @@ end
 
 function commands.watch()
     ns.Diagnostics.ToggleWatch()
+end
+
+function commands.rendertest()
+    ns.Diagnostics.ToggleRenderTest()
 end
 
 function commands.copy()
