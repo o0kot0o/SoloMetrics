@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 — 2026-11-22 (M3.2e profiles)
+
+- Profiles: create, duplicate, rename, delete, switch; optional separate profile per character.
+- Share codes: export a profile's appearance, import someone else's (validated, data-only, never overwrites existing profiles).
+- Settings window (`/sm config`, minimap button, addon compartment) with all appearance settings, themed color picker, search, reset and revert.
+- Grow direction (up/down), minimap button, scale keeps position.
+
 ## 0.2.0 — 2026-11-22 (M3 phase 1: style system)
 
 - Every visual layer styleable: backdrop, border, accent, header (each item), rows, icons, bar fill/background/texture, text font/size/outline/shadow, per-column colors and toggles.

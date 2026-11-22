@@ -524,3 +524,141 @@ end
 function W.CloseColorPicker()
     if picker and picker:IsShown() then picker:Hide() end
 end
+
+---------------------------------------------------------------------------
+-- Dialog: title, message, optional single-line or multi-line input.
+-- opts = { title, message, text, multiline, readOnly, noInput, okLabel,
+--          hideCancel, onOK = function(text) return true | false, err end }
+---------------------------------------------------------------------------
+local dialog
+local DLG_W = 460
+
+local function BuildDialog()
+    local d = CreateFrame("Frame", "SoloMetricsDialog", UIParent)
+    d:SetSize(DLG_W, 200)
+    d:SetPoint("CENTER", 0, 80)
+    d:SetFrameStrata("DIALOG")
+    d:SetToplevel(true)
+    d:SetClampedToScreen(true)
+    d:EnableMouse(true)
+    d:Hide()
+    W.Fill(d, "BACKGROUND", 0.075, 0.075, 0.085, 0.98)
+    W.Border(d, A[1], A[2], A[3], 0.6)
+
+    d.title = W.Text(d, 14, { 1, 1, 1, 1 })
+    d.title:SetPoint("TOPLEFT", 16, -14)
+    d.msg = W.Text(d, 12, { 0.75, 0.75, 0.8, 1 })
+    d.msg:SetPoint("TOPLEFT", 16, -38)
+    d.msg:SetWidth(DLG_W - 32)
+    d.msg:SetWordWrap(true)
+
+    d.single = W.Edit(d, DLG_W - 32)
+    d.single:SetHeight(24)
+    d.single:SetScript("OnEscapePressed", function() d:Hide() end)
+    d.single.onCommit = function() d.ok:Click() end
+
+    d.box = CreateFrame("Frame", nil, d)
+    d.box:SetSize(DLG_W - 32, 120)
+    W.Fill(d.box, "BACKGROUND", 0.05, 0.05, 0.06, 1)
+    W.Border(d.box, 0.3, 0.3, 0.33, 1)
+    d.scroll = CreateFrame("ScrollFrame", nil, d.box)
+    d.scroll:SetPoint("TOPLEFT", 6, -6)
+    d.scroll:SetPoint("BOTTOMRIGHT", -6, 6)
+    d.multi = CreateFrame("EditBox", nil, d.scroll)
+    d.multi:SetMultiLine(true)
+    d.multi:SetAutoFocus(false)
+    d.multi:SetFont(W.Font(), 12, "")
+    d.multi:SetTextColor(1, 1, 1, 1)
+    d.multi:SetWidth(DLG_W - 44)
+    d.multi:SetMaxLetters(8000)
+    d.scroll:SetScrollChild(d.multi)
+    d.scroll:EnableMouseWheel(true)
+    d.scroll:SetScript("OnMouseWheel", function(self, delta)
+        local maxV = math.max(0, d.multi:GetHeight() - self:GetHeight())
+        self:SetVerticalScroll(math.max(0, math.min(maxV, self:GetVerticalScroll() - delta * 20)))
+    end)
+    d.box:EnableMouse(true)
+    d.box:SetScript("OnMouseDown", function() d.multi:SetFocus() end)
+    d.multi:SetScript("OnEscapePressed", function() d:Hide() end)
+    d.multi:SetScript("OnTextChanged", function(self, userInput)
+        if d.readOnly and userInput then
+            self:SetText(d.readOnlyText or "")
+            self:HighlightText()
+        end
+    end)
+    d.multi:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+
+    d.err = W.Text(d, 11, { 1, 0.45, 0.45, 1 })
+    d.err:SetWidth(DLG_W - 32)
+    d.err:SetWordWrap(true)
+
+    d.ok = W.Button(d, 110, 24, "OK")
+    d.ok:SetPoint("BOTTOMRIGHT", -16, 14)
+    d.ok.text:SetTextColor(A[1], A[2], A[3], 1)
+    d.cancel = W.Button(d, 110, 24, "Cancel")
+    d.cancel:SetPoint("RIGHT", d.ok, "LEFT", -8, 0)
+    d.cancel:SetScript("OnClick", function() d:Hide() end)
+
+    dialog = d
+end
+
+function W.Dialog(opts)
+    if not dialog then BuildDialog() end
+    local d = dialog
+    d.title:SetText(opts.title or "")
+    d.msg:SetText(opts.message or "")
+    local y = -38 - math.ceil(d.msg:GetStringHeight()) - 12
+
+    d.single:Hide()
+    d.box:Hide()
+    d.readOnly = opts.readOnly
+    d.readOnlyText = opts.text
+    if opts.multiline then
+        d.box:ClearAllPoints()
+        d.box:SetPoint("TOPLEFT", 16, y)
+        d.multi:SetText(opts.text or "")
+        d.scroll:SetVerticalScroll(0)
+        d.box:Show()
+        y = y - 128
+    elseif not opts.noInput then
+        d.single:ClearAllPoints()
+        d.single:SetPoint("TOPLEFT", 16, y)
+        d.single:SetText(opts.text or "")
+        d.single:Show()
+        y = y - 32
+    end
+    d.err:ClearAllPoints()
+    d.err:SetPoint("TOPLEFT", 16, y)
+    d.err:SetText("")
+    y = y - 22
+
+    d.ok.text:SetText(opts.okLabel or "OK")
+    d.cancel:SetShown(not opts.hideCancel)
+    d:SetHeight(-y + 24 + 14 + 6)
+
+    d.ok:SetScript("OnClick", function()
+        local text = opts.multiline and d.multi:GetText() or d.single:GetText()
+        if opts.onOK then
+            local ok, err = opts.onOK(text)
+            if ok == false then
+                d.err:SetText(err or "Invalid input.")
+                return
+            end
+        end
+        d:Hide()
+    end)
+
+    d:Show()
+    d:Raise()
+    if opts.multiline then
+        d.multi:SetFocus()
+        d.multi:HighlightText()
+    elseif not opts.noInput then
+        d.single:SetFocus()
+        d.single:HighlightText()
+    end
+end
+
+function W.CloseDialog()
+    if dialog and dialog:IsShown() then dialog:Hide() end
+end

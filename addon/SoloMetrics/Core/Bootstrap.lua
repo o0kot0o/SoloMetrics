@@ -79,6 +79,11 @@ local function InitDB()
             db.profiles[name] = ns.Theme.Validate(style)
         end
     end
+    -- per-character profile choices: { ["Name - Realm"] = profileName } (local only, never exported)
+    if type(db.charProfile) ~= "table" then db.charProfile = {} end
+    for k, v in pairs(db.charProfile) do
+        if type(k) ~= "string" or type(v) ~= "string" or not db.profiles[v] then db.charProfile[k] = nil end
+    end
     if type(db.activeProfile) ~= "string" or not db.profiles[db.activeProfile] then
         db.activeProfile = next(db.profiles)
     end
@@ -89,7 +94,7 @@ end
 -- Slash commands
 ---------------------------------------------------------------------------
 local PLANNED = {
-    training = "M5", history = "M4", profile = "M5",
+    training = "M5", history = "M4",
 }
 
 local commands = {}
@@ -97,6 +102,7 @@ local commands = {}
 function commands.help()
     ns.Print("v" .. ns.VERSION .. " commands:")
     ns.Print("  /sm config - open the settings window")
+    ns.Print("  /sm profile - profiles: switch, create, import/export")
     ns.Print("  /sm - show/hide the meter")
     ns.Print("  /sm minimap - show/hide the minimap button")
     ns.Print("  /sm edit - unlock: drag to move, right-click switches Current/Overall")
@@ -121,6 +127,7 @@ function commands.version()
 end
 
 function commands.config() ns.Config.Toggle() end
+function commands.profile() ns.Config.Open("profiles") end
 function commands.edit() ns.SpellMeter.SetLocked(false) end
 function commands.lock() ns.SpellMeter.SetLocked(true) end
 function commands.session() ns.SpellMeter.ToggleSession() end
@@ -141,7 +148,7 @@ function commands.preset(rest)
         end
         return
     end
-    ns.db.profiles[ns.db.activeProfile] = ns.Theme.BuildPreset(key)
+    ns.db.profiles[ns.Profiles.ActiveName()] = ns.Theme.BuildPreset(key)
     ns.SpellMeter.ApplyStyle()
     ns.Print("Applied preset: " .. ns.Theme.PRESETS[key].label)
 end
@@ -173,7 +180,7 @@ function commands.get(rest)
     local prefix = strtrim(rest or ""):lower()
     local st = ns.Theme.Active()
     ns.Print(("Style settings (profile '%s')%s - colors are RRGGBBAA:"):format(
-        ns.db.activeProfile, prefix ~= "" and (" matching '" .. prefix .. "'") or ""))
+        ns.Profiles.ActiveName(), prefix ~= "" and (" matching '" .. prefix .. "'") or ""))
     for _, e in ipairs(ns.Theme.SCHEMA) do
         if prefix == "" or e[1]:lower():sub(1, #prefix) == prefix then
             local range = (e[2] == "number") and (" [" .. e[3] .. "-" .. e[4] .. "]") or (" (" .. e[2] .. ")")

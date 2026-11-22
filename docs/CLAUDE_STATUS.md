@@ -1,5 +1,18 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: M3.2e profiles deployed as v0.4.0 — awaiting in-game test
+
+**Files:**
+- `Settings/Profiles.lua` — create / duplicate / rename / delete (not the last) / switch; optional per-character profile (`db.charProfile["Name - Realm"]`, local only, never exported); share codes `SM1:<name>:<path=value;...>:<checksum>` containing only non-default appearance values. Import: size cap 6000, prefix/version check, Adler-style checksum, every value parsed with `Theme.ParseValue` and the result passed through `Theme.Validate`; malformed → rejected with a message and nothing changed; unknown setting keys (newer versions) skipped and counted; always imported as a NEW profile (unique name). No `loadstring`. Separator is `:` because WoW edit boxes treat `|` as an escape character.
+- `Settings/Widgets.lua` — themed dialog (single-line / multi-line read-only or editable / confirm-only), inline error text, Enter = OK, Escape = close.
+- `Settings/ConfigWindow.lua` — Profiles page: active-profile dropdown, per-character toggle, New / Duplicate / Rename / Delete, Export / Import share code, presets. Revert now restores the whole profile set (created/deleted/renamed profiles, selection, per-character choice). `Config.Open(category)`; `/sm profile` opens Profiles.
+- `Appearance/Theme.lua` — `Active()` resolves through `Profiles.ActiveName()` (per-character override, else account default).
+- SV: `charProfile` table (validated on load).
+
+**Acceptance tests to run:** export → import round trip gives identical visuals; damaged/garbage code rejected with existing profiles unchanged; switching presets/profiles doesn't corrupt saved customizations; persistence over /reload, relog, restart.
+
+---
+
 ## UPDATE 2026-11-22: M3.2a + M3.2b (+ core of M3.2c) v0.3.0 — loaded and working in game
 
 Implements `CONFIG_UI_DESIGN.md` slices a/b.

@@ -152,9 +152,14 @@ R.CATEGORIES = {
     {
         id = "profiles", label = "Profiles",
         items = {
+            { kind = "note", text = "A profile is a complete saved appearance. Switch between them any time; meter behaviour (General) is shared." },
+            { kind = "profiles" },
+            SEC("Share"),
+            { kind = "note", text = "Share codes contain only appearance settings - never character names, realms or combat data. Imports are checked setting by setting and rejected safely if damaged." },
+            { kind = "share" },
+            SEC("Presets"),
             { kind = "note", profileInfo = true },
             { kind = "presets" },
-            { kind = "note", text = "Creating, renaming, duplicating, importing and exporting profiles arrives in the next update." },
         },
     },
 }

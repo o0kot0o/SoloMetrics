@@ -409,7 +409,7 @@ constructors.presets = function()
         b.sub:SetPoint("BOTTOMLEFT", 8, 8)
         b.sub:SetText("Apply preset")
         b:SetScript("OnClick", function()
-            ns.db.profiles[ns.db.activeProfile] = ns.Theme.BuildPreset(key)
+            ns.db.profiles[ns.Profiles.ActiveName()] = ns.Theme.BuildPreset(key)
             ns.SpellMeter.ApplyStyle()
             RefreshAll()
             ns.Print("Applied preset: " .. p.label)
@@ -423,6 +423,172 @@ constructors.presets = function()
         b:HookScript("OnLeave", function() GameTooltip:Hide() end)
         row.cards[i] = b
     end
+    return row
+end
+
+---------------------------------------------------------------------------
+-- Profiles page rows
+---------------------------------------------------------------------------
+local Render -- forward declaration (defined below)
+
+local function AfterProfileChange()
+    Render(false)
+end
+
+local function ProfileActions()
+    local P = ns.Profiles
+    return {
+        new = function()
+            W.Dialog({
+                title = "New profile",
+                message = "Creates a profile with the default Modern Dark style and switches to it.",
+                text = P.UniqueName("New profile"), okLabel = "Create",
+                onOK = function(t)
+                    local n, err = P.Create(t, false)
+                    if not n then return false, err end
+                    AfterProfileChange()
+                    return true
+                end,
+            })
+        end,
+        duplicate = function()
+            W.Dialog({
+                title = "Duplicate profile",
+                message = ("Copies '%s' into a new profile and switches to it."):format(P.ActiveName()),
+                text = P.UniqueName(P.ActiveName() .. " copy"), okLabel = "Duplicate",
+                onOK = function(t)
+                    local n, err = P.Duplicate(t)
+                    if not n then return false, err end
+                    AfterProfileChange()
+                    return true
+                end,
+            })
+        end,
+        rename = function()
+            local old = P.ActiveName()
+            W.Dialog({
+                title = "Rename profile",
+                message = ("New name for '%s':"):format(old),
+                text = old, okLabel = "Rename",
+                onOK = function(t)
+                    local n, err = P.Rename(old, t)
+                    if not n then return false, err end
+                    AfterProfileChange()
+                    return true
+                end,
+            })
+        end,
+        delete = function()
+            local name = P.ActiveName()
+            W.Dialog({
+                title = "Delete profile",
+                message = ("Delete profile '%s'? This can't be undone once the settings window is closed (Revert changes still works until then)."):format(name),
+                noInput = true, okLabel = "Delete",
+                onOK = function()
+                    local ok, err = P.Delete(name)
+                    if not ok then return false, err end
+                    AfterProfileChange()
+                    return true
+                end,
+            })
+        end,
+        export = function()
+            W.Dialog({
+                title = "Export profile",
+                message = ("Share code for '%s'. Press Ctrl+C to copy. It contains only appearance settings - no character, realm or combat data."):format(P.ActiveName()),
+                text = P.Export(P.ActiveName()), multiline = true, readOnly = true,
+                okLabel = "Done", hideCancel = true,
+            })
+        end,
+        import = function()
+            W.Dialog({
+                title = "Import profile",
+                message = "Paste a SoloMetrics profile code (Ctrl+V). It is added as a new profile; your existing profiles are not changed.",
+                text = "", multiline = true, okLabel = "Import",
+                onOK = function(t)
+                    local n, info = P.Import(t)
+                    if not n then return false, info end
+                    if info and info > 0 then
+                        ns.Print(("Imported '%s' (%d setting(s) from a newer version were skipped)."):format(n, info))
+                    else
+                        ns.Print(("Imported profile '%s'."):format(n))
+                    end
+                    AfterProfileChange()
+                    return true
+                end,
+            })
+        end,
+    }
+end
+
+constructors.profiles = function()
+    local row = BaseRow("profiles", 128)
+    local P = ns.Profiles
+    local actions = ProfileActions()
+
+    row.label = W.Text(row, 12)
+    row.label:SetPoint("TOPLEFT", LABEL_X, -12)
+    row.label:SetText("Active profile")
+    row.select = W.Button(row, 220, 22, "")
+    row.select:SetPoint("TOPLEFT", CONTROL_X, -8)
+    row.select.text:SetJustifyH("LEFT")
+    row.select.arrow = W.Text(row.select, 10, { 0.6, 0.6, 0.65, 1 }, "RIGHT")
+    row.select.arrow:SetPoint("RIGHT", -6, 0)
+    row.select.arrow:SetText("v")
+    row.select:SetScript("OnClick", function(self)
+        local opts = {}
+        for _, n in ipairs(P.List()) do opts[#opts + 1] = { value = n, label = n } end
+        W.OpenList(self, opts, P.ActiveName(), function(v)
+            P.Switch(v)
+            AfterProfileChange()
+        end)
+    end)
+
+    row.perCharLabel = W.Text(row, 12)
+    row.perCharLabel:SetPoint("TOPLEFT", LABEL_X, -44)
+    row.perCharLabel:SetText("Separate profile for this character")
+    row.perChar = W.Check(row)
+    row.perChar:SetPoint("TOPLEFT", CONTROL_X, -42)
+    row.perChar:SetScript("OnClick", function()
+        P.SetPerCharacter(not P.IsPerCharacter())
+        AfterProfileChange()
+    end)
+    row.perChar:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Separate profile for this character")
+        GameTooltip:AddLine("On: this character remembers its own profile choice. Off: it uses the account-wide profile.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    row.perChar:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    row.buttons = {}
+    local defs = { { "new", "New" }, { "duplicate", "Duplicate" }, { "rename", "Rename" }, { "delete", "Delete" } }
+    for i, def in ipairs(defs) do
+        local b = W.Button(row, 120, 24, def[2])
+        b:SetPoint("TOPLEFT", LABEL_X - 4 + (i - 1) * 128, -80)
+        b:SetScript("OnClick", actions[def[1]])
+        row.buttons[def[1]] = b
+    end
+
+    function row:Refresh()
+        self.select.text:SetText(P.ActiveName())
+        self.perChar:SetOn(P.IsPerCharacter())
+        local canDelete = #P.List() > 1
+        self.buttons.delete:SetAlpha(canDelete and 1 or 0.4)
+        self.buttons.delete:EnableMouse(canDelete)
+    end
+    return row
+end
+
+constructors.share = function()
+    local row = BaseRow("share", 40)
+    local actions = ProfileActions()
+    local exp = W.Button(row, 180, 24, "Export share code")
+    exp:SetPoint("LEFT", LABEL_X - 4, 0)
+    exp:SetScript("OnClick", actions.export)
+    local imp = W.Button(row, 180, 24, "Import share code")
+    imp:SetPoint("LEFT", exp, "RIGHT", 8, 0)
+    imp:SetScript("OnClick", actions.import)
     return row
 end
 
@@ -459,7 +625,7 @@ local function CategoryById(id)
     end
 end
 
-local function Render(resetScroll)
+function Render(resetScroll)
     W.CloseList()
     ReleaseAll()
     local y = 4
@@ -482,13 +648,17 @@ local function Render(resetScroll)
         elseif k == "note" then
             local row = Acquire("note")
             if item.profileInfo then
-                row:SetNote(("Active profile: |cffffffff%s|r. Presets below replace this profile's style."):format(ns.db.activeProfile))
+                row:SetNote(("Presets replace the style of the active profile (|cffffffff%s|r)."):format(ns.Profiles.ActiveName()))
             else
                 row:SetNote(item.text)
             end
             place(row)
         elseif k == "presets" then
             place(Acquire("presets"))
+        elseif k == "profiles" or k == "share" then
+            local row = Acquire(k)
+            if row.Refresh then row:Refresh() end
+            place(row)
         elseif k == "action" then
             local row = Acquire("action")
             row.item = item
@@ -549,16 +719,26 @@ end
 ---------------------------------------------------------------------------
 local function TakeSnapshot()
     snapshot = {
-        profile = ns.db.activeProfile,
-        style = ns.Theme.DeepCopy(Active()),
+        activeProfile = ns.db.activeProfile,
+        profiles = ns.Theme.DeepCopy(ns.db.profiles),
+        charProfile = ns.Theme.DeepCopy(ns.db.charProfile),
         meter = ns.Theme.DeepCopy(ns.db.meter),
     }
 end
 
+-- Restores styles, the profile list (incl. created/deleted/renamed
+-- profiles), profile selection and meter settings to the opening state.
 local function Revert()
     if not snapshot then return end
-    ns.db.activeProfile = snapshot.profile
-    ns.db.profiles[snapshot.profile] = ns.Theme.Validate(ns.Theme.DeepCopy(snapshot.style))
+    W.CloseDialog()
+    W.CloseColorPicker()
+    local profiles = {}
+    for name, style in pairs(snapshot.profiles) do
+        profiles[name] = ns.Theme.Validate(ns.Theme.DeepCopy(style))
+    end
+    ns.db.profiles = profiles
+    ns.db.activeProfile = snapshot.activeProfile
+    ns.db.charProfile = ns.Theme.DeepCopy(snapshot.charProfile)
     ns.db.meter = ns.Theme.DeepCopy(snapshot.meter)
     ns.SpellMeter.ReapplyAll()
     Render(false)
@@ -795,6 +975,7 @@ local function Build()
     win:SetScript("OnHide", function()
         W.CloseList()
         W.CloseColorPicker() -- closing without OK restores the original color
+        W.CloseDialog()
         if demoStartedHere and ns.Demo.IsActive() then ns.Demo.Stop() end
         demoStartedHere = false
     end)
@@ -809,9 +990,14 @@ end
 ---------------------------------------------------------------------------
 -- Public
 ---------------------------------------------------------------------------
-function C.Open()
+function C.Open(categoryId)
     if not win then Build() end
-    TakeSnapshot()
+    if categoryId and CategoryById(categoryId) then
+        currentCat = categoryId
+        query = ""
+        searchBox:SetText("")
+    end
+    if not win:IsShown() then TakeSnapshot() end
     win:Show()
     Render(true)
 end

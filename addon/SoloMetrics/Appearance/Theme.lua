@@ -304,6 +304,5 @@ end
 -- Active profile access
 ---------------------------------------------------------------------------
 function T.Active()
-    local db = ns.db
-    return db.profiles[db.activeProfile]
+    return ns.db.profiles[ns.Profiles.ActiveName()]
 end
