@@ -1,6 +1,8 @@
 # SoloMetrics — Claude Status
 
-## UPDATE 2026-11-22: v0.4.1 — branding + custom texture pack integrated (awaiting in-game check)
+## UPDATE 2026-11-22: v0.4.1 — branding + custom texture pack integrated (user-verified)
+
+User confirmed: new icon shows correctly (also inside EllesmereUI's minimap button bar); all custom textures load. Fine detail is hard to see on small bars (expected at low row heights).
 
 - Icon: `Assets/Icons/SoloMetrics_Minimap_64.tga` on the minimap button (drawn full-size, no tracking-border ring since the art has its own ring; additive highlight); `SoloMetrics_AddonIcon.tga` as TOC `IconTexture` (addon list / compartment).
 - Textures: the 6 SMTex textures arrived as 2172x724 24-bit TGA (4.7 MB each, not power-of-two). Converted from the included PNGs to **512x128** 24-bit TGA (~197 KB each) with high-quality bicubic resampling; originals kept out of the repo (zips are git-ignored).
