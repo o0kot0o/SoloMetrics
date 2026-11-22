@@ -284,6 +284,7 @@ end
 
 local picker
 local SV, STRIP, PAD = 160, 16, 12
+local COLW = 128 -- right column (swatches, hex) width
 
 local function CursorFraction(frame)
     local x, y = GetCursorPosition()
@@ -354,7 +355,7 @@ end
 local function BuildPicker()
     local f = CreateFrame("Frame", "SoloMetricsColorPicker", UIParent)
     local rightX = PAD + SV + 10 + STRIP + 10 + STRIP + 16
-    f:SetSize(rightX + 110 + PAD, PAD + SV + 12 + 26 + PAD)
+    f:SetSize(rightX + COLW + PAD + 4, PAD + SV + 12 + 26 + PAD)
     f:SetFrameStrata("DIALOG")
     f:SetClampedToScreen(true)
     f:EnableMouse(true)
@@ -430,9 +431,9 @@ local function BuildPicker()
     -- Right column: swatches, hex, opacity readout
     local function Swatch(label, y)
         local s = CreateFrame("Button", nil, f)
-        s:SetSize(110, 30)
+        s:SetSize(COLW, 30)
         s:SetPoint("TOPLEFT", rightX, y)
-        Checker(s, 110, 30, 10)
+        Checker(s, COLW, 30, 10)
         s.color = s:CreateTexture(nil, "ARTWORK")
         s.color:SetAllPoints()
         W.Border(s, 0.35, 0.35, 0.4, 1)
@@ -442,16 +443,23 @@ local function BuildPicker()
         return s
     end
     f.newSwatch = Swatch("New", -PAD - 12)
-    f.oldSwatch = Swatch("Original (click to restore)", -PAD - 12 - 30 - 18)
+    f.oldSwatch = Swatch("Original", -PAD - 12 - 30 - 18)
     f.oldSwatch:SetScript("OnClick", function()
         local o = picker.orig
         SetPickerRGBA(o[1], o[2], o[3], o[4])
     end)
+    f.oldSwatch:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Original color")
+        GameTooltip:AddLine("Click to restore it.", 0.8, 0.8, 0.8)
+        GameTooltip:Show()
+    end)
+    f.oldSwatch:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     local hexLabel = W.Text(f, 10, { 0.6, 0.6, 0.65, 1 })
     hexLabel:SetPoint("TOPLEFT", rightX, -PAD - 12 - 60 - 36)
     hexLabel:SetText("Hex  #RRGGBBAA")
-    f.hex = W.Edit(f, 110)
+    f.hex = W.Edit(f, COLW)
     f.hex:SetPoint("TOPLEFT", hexLabel, "BOTTOMLEFT", 0, -3)
     f.hex:SetMaxLetters(9)
     f.hex.onCommit = function(text)
