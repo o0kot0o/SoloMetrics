@@ -208,7 +208,7 @@ local function CreateMeter()
         if dirty and accum >= THROTTLE then
             accum = 0
             M.Render(true)
-        elseif accum >= COMBAT_POLL and InCombatLockdown() then
+        elseif accum >= COMBAT_POLL and (InCombatLockdown() or ns.Demo.IsRunning()) then
             -- text/timer only: re-setting bars would restart their animation
             accum = 0
             M.Render(false)
@@ -227,12 +227,21 @@ function M.Render(updateBars)
     if updateBars == nil then updateBars = true end
     if updateBars then dirty = false end
     local cfg = Cfg()
-    local snap = ns.API.Snapshot(cfg.session)
+    local snap
+    if ns.Demo.IsActive() then
+        snap = ns.Demo.Snapshot()
+    else
+        snap = ns.API.Snapshot(cfg.session)
+    end
 
     local r, g, b = ClassColor(snap.classFilename)
     header.accent:SetColorTexture(r, g, b, 0.9)
     header.timer:SetText(FormatTime(snap.duration))
-    header.session:SetText(cfg.session == "overall" and "Overall" or "Current")
+    if snap.demo then
+        header.session:SetText("|cffff9900DEMO|r")
+    else
+        header.session:SetText(cfg.session == "overall" and "Overall" or "Current")
+    end
     if snap.hasPlayer then SetRate(header.dps, snap.dps) else header.dps:SetText("-") end
     SetNumber(header.total, snap.total)
 
@@ -283,6 +292,11 @@ function M.ResetBars()
     end
 end
 
+function M.Show()
+    frame:Show()
+    Cfg().shown = true
+end
+
 function M.Toggle()
     local show = not frame:IsShown()
     frame:SetShown(show)
@@ -319,8 +333,9 @@ function M.Init()
     ev:RegisterEvent("PLAYER_REGEN_DISABLED")
     ev:RegisterEvent("PLAYER_REGEN_ENABLED")
     ev:SetScript("OnEvent", function(_, event)
-        if event == "PLAYER_REGEN_DISABLED" and Cfg().session == "current" then
-            M.ResetBars()
+        if event == "PLAYER_REGEN_DISABLED" then
+            ns.Demo.Stop("real combat started")
+            if Cfg().session == "current" then M.ResetBars() end
         end
         dirty = true
     end)

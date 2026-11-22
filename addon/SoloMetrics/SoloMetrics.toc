@@ -9,4 +9,5 @@ Core\Bootstrap.lua
 Core\SecretSafety.lua
 Core\APIAdapter.lua
 Core\Diagnostics.lua
+Analytics\Demo.lua
 UI\SpellMeter.lua

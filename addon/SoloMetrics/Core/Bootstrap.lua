@@ -61,7 +61,7 @@ end
 -- Slash commands
 ---------------------------------------------------------------------------
 local PLANNED = {
-    config = "M3", test = "M3",
+    config = "M3",
     training = "M5", history = "M4", profile = "M5",
 }
 
@@ -77,6 +77,7 @@ function commands.help()
     ns.Print("  /sm rows <1-20> - max spell rows")
     ns.Print("  /sm bars - bar length: relative to top spell / share of total")
     ns.Print("  /sm smooth - toggle animated bars")
+    ns.Print("  /sm test [seconds] [big] - simulated DEMO fight (fake numbers); again to clear")
     ns.Print("  /sm resetui - re-center and unlock the meter (keeps data)")
     ns.Print("  /sm version")
     ns.Print("  diagnostics: /sm debug, /sm probe, /sm watch, /sm rendertest, /sm copy")
@@ -136,6 +137,7 @@ function commands.probe(rest) ns.Diagnostics.Probe(rest) end
 function commands.watch() ns.Diagnostics.ToggleWatch() end
 function commands.rendertest() ns.Diagnostics.ToggleRenderTest() end
 function commands.copy() ns.Diagnostics.ShowCopy() end
+function commands.test(rest) ns.Demo.Toggle(rest) end
 function commands.bardebug() ns.Diagnostics.BarDebug() end
 
 SLASH_SOLOMETRICS1 = "/sm"
