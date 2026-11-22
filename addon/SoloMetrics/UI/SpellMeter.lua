@@ -13,13 +13,13 @@ local ROW_H = 18
 local ROW_GAP = 1
 local ICON = 18
 local PAD = 4
-local THROTTLE = 0.2   -- max 5 full renders/sec
-local TIMER_TICK = 0.5
+local THROTTLE = 0.2     -- event-driven: max 5 full renders/sec
+local COMBAT_POLL = 0.25 -- in combat: also refresh 4x/sec without waiting for events
 
 local frame, header
 local rows = {}
 local dirty = true
-local accum, timerAccum = 0, 0
+local accum = 0
 
 local function Cfg() return ns.db.meter end
 
@@ -33,6 +33,16 @@ local function SetNumber(fs, v)
         fs:SetText(BreakUpLargeNumbers(v))
     else
         fs:SetText(AbbreviateNumbers(v))
+    end
+end
+
+-- Rates (DPS): one decimal via native SetFormattedText (accepts secrets).
+-- AbbreviateNumbers leaves small floats at full precision ("5.0270...").
+local function SetRate(fs, v)
+    if type(v) ~= "number" then
+        fs:SetText("-")
+    else
+        fs:SetFormattedText("%.1f", v)
     end
 end
 
@@ -77,7 +87,7 @@ local function CreateRow(i)
 
     r.dps = NewText(r, "GameFontHighlightSmall", "RIGHT")
     r.dps:SetPoint("RIGHT", -4, 0)
-    r.dps:SetWidth(46)
+    r.dps:SetWidth(50)
 
     r.amount = NewText(r, "GameFontHighlightSmall", "RIGHT")
     r.amount:SetPoint("RIGHT", r.dps, "LEFT", -4, 0)
@@ -168,15 +178,9 @@ local function CreateMeter()
 
     frame:SetScript("OnUpdate", function(_, elapsed)
         accum = accum + elapsed
-        timerAccum = timerAccum + elapsed
-        if dirty and accum >= THROTTLE then
+        if (dirty and accum >= THROTTLE) or (accum >= COMBAT_POLL and InCombatLockdown()) then
             accum = 0
             M.Render()
-        elseif timerAccum >= TIMER_TICK and InCombatLockdown() then
-            timerAccum = 0
-            local ok, d = pcall(C_DamageMeter.GetSessionDurationSeconds,
-                Cfg().session == "overall" and Enum.DamageMeterSessionType.Overall or Enum.DamageMeterSessionType.Current)
-            if ok then header.timer:SetText(FormatTime(ns.SecretSafety.Readable(d))) end
         end
     end)
     frame:SetScript("OnShow", function() dirty = true end)
@@ -197,7 +201,7 @@ function M.Render()
     header.accent:SetColorTexture(r, g, b, 0.9)
     header.timer:SetText(FormatTime(snap.duration))
     header.session:SetText(cfg.session == "overall" and "Overall" or "Current")
-    if snap.hasPlayer then SetNumber(header.dps, snap.dps) else header.dps:SetText("-") end
+    if snap.hasPlayer then SetRate(header.dps, snap.dps) else header.dps:SetText("-") end
     SetNumber(header.total, snap.total)
 
     local n = math.min(snap.spellCount, cfg.maxRows)
@@ -216,7 +220,7 @@ function M.Render()
             if getTex then row.icon:SetTexture(getTex(sp.spellID)) end
             if getName then row.name:SetText(getName(sp.spellID)) end
             SetNumber(row.amount, sp.totalAmount)
-            SetNumber(row.dps, sp.amountPerSecond)
+            SetRate(row.dps, sp.amountPerSecond)
             row:Show()
         else
             row:Hide()
