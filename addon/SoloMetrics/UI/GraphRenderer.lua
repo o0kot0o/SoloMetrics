@@ -16,6 +16,15 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 local R = {}
 R.__index = R
 
+-- Scale labels are always readable numbers (never combat values), so they
+-- can be formatted in Lua: one decimal below 1000 ("5.8", "32"), abbreviated above.
+local function FormatAxis(v)
+    if type(v) ~= "number" then return "" end
+    if v >= 1000 then return AbbreviateNumbers(v) end
+    local s = ("%.1f"):format(v)
+    return (s:gsub("%.0$", ""))
+end
+
 local function PlayerClassColor()
     local _, class = UnitClass("player")
     local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
@@ -123,8 +132,8 @@ function R:SetScale(max, min)
     min = (type(min) == "number" and min >= 0 and min < max) and min or 0
     self.max, self.min = max, min
     for _, b in ipairs(self.cols) do b:SetMinMaxValues(min, max) end
-    self.axisTop:SetText(AbbreviateNumbers(max))
-    self.axisZero:SetText(min > 0 and AbbreviateNumbers(min) or "0")
+    self.axisTop:SetText(FormatAxis(max))
+    self.axisZero:SetText(min > 0 and FormatAxis(min) or "0")
 end
 
 -- v may be secret: it only goes into SetValue.
@@ -158,7 +167,7 @@ function R:Layout()
     self.axisZero:SetPoint("BOTTOMRIGHT", self.plot, "BOTTOMLEFT", -3, 0)
     self.axisTop:SetShown(c.axis)
     self.axisZero:SetShown(c.axis)
-    self.axisTop:SetText(AbbreviateNumbers(self.max))
+    self.axisTop:SetText(FormatAxis(self.max))
 
     -- grid
     local gl = c.grid and c.gridLines or 0
