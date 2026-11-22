@@ -136,6 +136,7 @@ function commands.probe(rest) ns.Diagnostics.Probe(rest) end
 function commands.watch() ns.Diagnostics.ToggleWatch() end
 function commands.rendertest() ns.Diagnostics.ToggleRenderTest() end
 function commands.copy() ns.Diagnostics.ShowCopy() end
+function commands.bardebug() ns.Diagnostics.BarDebug() end
 
 SLASH_SOLOMETRICS1 = "/sm"
 SLASH_SOLOMETRICS2 = "/solometrics"

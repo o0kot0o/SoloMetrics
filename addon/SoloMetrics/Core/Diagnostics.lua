@@ -705,6 +705,41 @@ function D.ToggleRenderTest()
 end
 
 ---------------------------------------------------------------------------
+-- /sm bardebug: what the meter's bars actually hold vs. the data (out of combat)
+---------------------------------------------------------------------------
+function D.BarDebug()
+    local r = NewReport("bar debug")
+    local out = r.out
+    if InCombat() then
+        out("Run this out of combat (values are secret in combat).")
+        r.finish(true)
+        return
+    end
+    local cfg = ns.db.meter
+    out(("barScale=%s smoothBars=%s session=%s smoothingAvailable=%s"):format(
+        tostring(cfg.barScale), tostring(cfg.smoothBars), tostring(cfg.session),
+        tostring(ns.SpellMeter.SmoothingAvailable())))
+    out(("GetTime=%.1f"):format(GetTime()))
+    local snap = ns.API.Snapshot(cfg.session)
+    local R = function(v) if IsSecret(v) then return "<secret>" end return tostring(v) end
+    out(("snapshot: duration=%s total=%s max=%s dps=%s spellCount=%s"):format(
+        R(snap.duration), R(snap.total), R(snap.max), R(snap.dps), R(snap.spellCount)))
+    local rows = ns.SpellMeter.GetRows()
+    for i, row in ipairs(rows) do
+        if row:IsShown() then
+            local mn, mx = row:GetMinMaxValues()
+            local v = row:GetValue()
+            local sp = snap.spells and snap.spells[i]
+            local name = row.name:GetText()
+            out(("row %d [%s]: bar min=%s max=%s value=%s | data total=%s aps=%s id=%s"):format(
+                i, R(name), R(mn), R(mx), R(v),
+                sp and R(sp.totalAmount) or "-", sp and R(sp.amountPerSecond) or "-", sp and R(sp.spellID) or "-"))
+        end
+    end
+    r.finish(true)
+end
+
+---------------------------------------------------------------------------
 -- /sm copy: copyable text window
 ---------------------------------------------------------------------------
 local copyFrame

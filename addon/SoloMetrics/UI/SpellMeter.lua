@@ -278,6 +278,8 @@ end
 ---------------------------------------------------------------------------
 function M.MarkDirty() dirty = true end
 
+function M.GetRows() return rows end
+
 -- New fight: empty all bars instantly so reused rows don't show stale values.
 function M.ResetBars()
     for _, row in ipairs(rows) do
