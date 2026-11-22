@@ -1,3 +1,5 @@
+<p align="center"><img src="branding/SoloMetrics_Logo_512.png" width="256" alt="SoloMetrics logo"></p>
+
 # SoloMetrics
 
 A lightweight, fully customizable **personal** damage meter for World of Warcraft: Forever.
@@ -24,6 +26,14 @@ Source lives in this repo; the game folder only receives copies.
 The deploy script refuses non-Forever clients, any destination not named `AddOns\SoloMetrics`,
 and an existing `SoloMetrics` folder it did not create. It only removes files it previously deployed
 (tracked in a manifest) and verifies every copied file by SHA-256.
+
+### Adding bar textures
+
+1. Put a `.tga` (power-of-two size, e.g. 512x128; uncompressed or RLE) in `addon/SoloMetrics/Assets/Textures/Custom/`.
+2. Run `powershell -ExecutionPolicy Bypass -File scripts\Update-TextureIndex.ps1` (regenerates `Assets/TextureIndex.lua`; WoW addons can't list folders at runtime).
+3. Deploy, then restart WoW (new files aren't picked up by `/reload`). The texture appears in Damage Bars → Bar texture.
+
+Validation fails if the index is stale or a TGA isn't power-of-two. Neutral grey textures work best: they're tinted by the bar color.
 
 ## Layout
 

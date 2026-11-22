@@ -1,16 +1,17 @@
 ## Interface: 16001
 ## Title: SoloMetrics
 ## Notes: Personal solo damage meter for WoW: Forever
-## Version: 0.4.0
+## Version: 0.4.1
 ## SavedVariables: SoloMetricsDB
 ## Category: Combat
-## IconTexture: Interface\Icons\Ability_Marksmanship
+## IconTexture: Interface\AddOns\SoloMetrics\Assets\Icons\SoloMetrics_AddonIcon
 ## AddonCompartmentFunc: SoloMetrics_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: SoloMetrics_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: SoloMetrics_OnAddonCompartmentLeave
 
 Core\Bootstrap.lua
 Core\SecretSafety.lua
+Assets\TextureIndex.lua
 Appearance\Theme.lua
 Core\APIAdapter.lua
 Core\Diagnostics.lua

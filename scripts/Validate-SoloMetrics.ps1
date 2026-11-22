@@ -86,6 +86,39 @@ foreach ($f in $luaFiles) {
 }
 Write-Host "  Lua files scanned: $($luaFiles.Count)"
 
+# Textures: every TGA must be power-of-two; the generated index must match
+# Assets\Textures\Custom (run scripts\Update-TextureIndex.ps1 after changes).
+foreach ($f in @($files | Where-Object { -not $_.PSIsContainer -and $_.Extension -ieq '.tga' })) {
+    $rel = $f.FullName.Substring($Source.Length).TrimStart('\')
+    $fs = [System.IO.File]::OpenRead($f.FullName)
+    $h = New-Object byte[] 18
+    $n = $fs.Read($h, 0, 18)
+    $fs.Close()
+    $w = $h[12] + 256 * $h[13]
+    $ht = $h[14] + 256 * $h[15]
+    if ($n -ne 18 -or ($h[2] -ne 2 -and $h[2] -ne 10)) {
+        $errors.Add("${rel}: not an uncompressed/RLE true-color TGA")
+    } elseif ((($w -band ($w - 1)) -ne 0) -or (($ht -band ($ht - 1)) -ne 0) -or $w -eq 0 -or $ht -eq 0) {
+        $errors.Add("${rel}: ${w}x${ht} is not power-of-two")
+    }
+}
+$customDir = Join-Path $Source 'Assets\Textures\Custom'
+$indexPath = Join-Path $Source 'Assets\TextureIndex.lua'
+$onDisk = @()
+if (Test-Path -LiteralPath $customDir) {
+    $onDisk = @(Get-ChildItem -LiteralPath $customDir -Filter '*.tga' -File | ForEach-Object { $_.BaseName } | Sort-Object)
+}
+$indexed = @()
+if (Test-Path -LiteralPath $indexPath) {
+    $indexed = @(Select-String -LiteralPath $indexPath -Pattern 'file = "([^"]+)"' -AllMatches |
+        ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } | Sort-Object)
+}
+if (($onDisk -join '|') -ne ($indexed -join '|')) {
+    $errors.Add('Assets\TextureIndex.lua is out of date - run scripts\Update-TextureIndex.ps1')
+} else {
+    Write-Host "  Custom textures indexed: $($onDisk.Count)"
+}
+
 $luac = $null
 foreach ($name in @('luac5.1', 'luac51', 'luac')) {
     $cmd = Get-Command $name -ErrorAction SilentlyContinue

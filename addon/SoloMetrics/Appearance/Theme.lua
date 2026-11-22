@@ -24,6 +24,15 @@ T.TEXTURES = {
     raid     = { label = "Raid", path = "Interface\\RaidFrame\\Raid-Bar-Hp-Fill" },
 }
 
+-- Bundled textures (Assets/Textures/Custom), listed by the generated
+-- Assets/TextureIndex.lua (scripts/Update-TextureIndex.ps1).
+T.ASSET_ROOT = "Interface\\AddOns\\SoloMetrics\\Assets\\"
+for _, t in ipairs(ns.CUSTOM_TEXTURES or {}) do
+    if type(t.key) == "string" and type(t.file) == "string" and not T.TEXTURES[t.key] then
+        T.TEXTURES[t.key] = { label = t.label or t.key, path = T.ASSET_ROOT .. "Textures\\Custom\\" .. t.file }
+    end
+end
+
 T.OUTLINES = { none = "", outline = "OUTLINE", thick = "THICKOUTLINE" }
 
 function T.FontPath(key)

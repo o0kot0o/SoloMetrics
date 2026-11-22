@@ -1,5 +1,15 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: v0.4.1 — branding + custom texture pack integrated (awaiting in-game check)
+
+- Icon: `Assets/Icons/SoloMetrics_Minimap_64.tga` on the minimap button (drawn full-size, no tracking-border ring since the art has its own ring; additive highlight); `SoloMetrics_AddonIcon.tga` as TOC `IconTexture` (addon list / compartment).
+- Textures: the 6 SMTex textures arrived as 2172x724 24-bit TGA (4.7 MB each, not power-of-two). Converted from the included PNGs to **512x128** 24-bit TGA (~197 KB each) with high-quality bicubic resampling; originals kept out of the repo (zips are git-ignored).
+- `scripts/Update-TextureIndex.ps1` generates `Assets/TextureIndex.lua` from `Assets/Textures/Custom/*.tga` (checks TGA type + power-of-two). Theme merges them into the bar texture list with friendly labels. Validator now fails on a stale index or any non-power-of-two TGA in the payload. Deploy still never modifies source.
+- `branding/` (repo root, not deployed): logo 512/1024 + 256 icon for README/release art.
+- Not changed: live C_DamageMeter handling, appearance system behaviour.
+
+---
+
 ## UPDATE 2026-11-22: M3.2e profiles deployed as v0.4.0 — awaiting in-game test
 
 **Files:**

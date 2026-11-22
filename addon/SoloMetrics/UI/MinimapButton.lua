@@ -6,7 +6,7 @@ local _, ns = ...
 local MB = {}
 ns.MinimapButton = MB
 
-MB.ICON = "Interface\\Icons\\Ability_Marksmanship"
+MB.ICON = "Interface\\AddOns\\SoloMetrics\\Assets\\Icons\\SoloMetrics_Minimap_64"
 
 local btn
 
@@ -61,24 +61,18 @@ local function Create()
     btn:SetFrameLevel(8)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btn:RegisterForDrag("LeftButton")
-    btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-
-    local bg = btn:CreateTexture(nil, "BACKGROUND")
-    bg:SetSize(20, 20)
-    bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-    bg:SetPoint("TOPLEFT", 7, -5)
-
+    -- The SoloMetrics icon is round with its own metal ring, so it is drawn
+    -- full-size without the standard tracking border.
     local icon = btn:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(18, 18)
+    icon:SetAllPoints()
     icon:SetTexture(MB.ICON)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    icon:SetPoint("TOPLEFT", 7, -6)
     btn.icon = icon
 
-    local border = btn:CreateTexture(nil, "OVERLAY")
-    border:SetSize(53, 53)
-    border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    border:SetPoint("TOPLEFT")
+    local hl = btn:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetTexture(MB.ICON)
+    hl:SetBlendMode("ADD")
+    hl:SetAlpha(0.35)
 
     btn:SetScript("OnClick", function(_, button) OnClick(button) end)
     btn:SetScript("OnEnter", ShowTooltip)
