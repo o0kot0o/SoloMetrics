@@ -1,5 +1,19 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: Widget Engine W2 + core W3 — v0.6.0 deployed, awaiting in-game test
+
+**graphtest result:** 0 errors and **user-confirmed visually** — live opaque graphs work (columns + dots + line follow secret values in combat). Event payload decoded: `(meterType, sessionID)`.
+**User feedback addressed:** graph uses a fixed time window (samples × interval); oldest column drops off. Declining column heights in long fights are the metric itself (running average DPS), now labeled "Average DPS so far"; "Total damage" metric is monotonic.
+
+**Files (new):**
+- `Settings/WidgetSchema.lua` — widget records (id-keyed, `type="graph"`), appearance schema (31 flat paths) with override-only storage resolved widget → user defaults → built-in; validation drops unknown types/paths; cap 12 widgets, ≤60 samples.
+- `UI/GraphRenderer.lua` — pooled vertical StatusBar columns (`Push(v)` = opaque `SetValue`), dots anchored to fill tops, `Line` regions between fill tops; styles area / columns / line / points; grid; axis labels (readable scale only); fixed window, newest at right.
+- `UI/WidgetManager.lua` — create / duplicate / delete (confirm) / rename; independent movable + resizable frames (corner grip), per-widget lock and click-through, visibility (always / in combat / out of combat / hidden), unlock-all edit mode with outline; one shared 0.25 s ticker, one snapshot per session per tick; Current widgets reset at combat start, Overall persist; auto scale after combat = readable final value × headroom (DPS 1.5, damage 1.1), or fixed scale; DEMO (`/sm test`) drives widgets and clears them on start/stop (labeled DEMO, never mixed).
+- Commands: `/sm widget new|list|edit`, `/sm widget <id> dup|delete|reset|lock|unlock|clickthrough|name|style|metric|session|show|window|scale|size|set|clear|paths|copyto|makedefault`.
+**Not yet:** Widgets page in `/sm config` (W4), spell context menu + per-fight provider (W5/W6), counter widget.
+
+---
+
 ## UPDATE 2026-11-22: Widget Engine W1 — architecture & feasibility (findings delivered; graphtest pending)
 
 **Deliverable:** `docs/WIDGETS_DESIGN.md` (feasibility answers to directive §3 Q1–6, data-source taxonomy live/fights/demo, widget SavedVariables schema with id-keyed widgets and override-only appearance, module boundaries, provider/renderer contracts, combat restrictions). Decision **D-008**.

@@ -84,6 +84,9 @@ local function InitDB()
     for k, v in pairs(db.charProfile) do
         if type(k) ~= "string" or type(v) ~= "string" or not db.profiles[v] then db.charProfile[k] = nil end
     end
+    -- widgets (validated; malformed/unknown widgets are dropped, never crash load)
+    ns.WidgetSchema.ValidateAll(db)
+
     if type(db.activeProfile) ~= "string" or not db.profiles[db.activeProfile] then
         db.activeProfile = next(db.profiles)
     end
@@ -103,6 +106,7 @@ function commands.help()
     ns.Print("v" .. ns.VERSION .. " commands:")
     ns.Print("  /sm config - open the settings window")
     ns.Print("  /sm profile - profiles: switch, create, import/export")
+    ns.Print("  /sm widget - graph widgets (new, list, edit, ...)")
     ns.Print("  /sm - show/hide the meter")
     ns.Print("  /sm minimap - show/hide the minimap button")
     ns.Print("  /sm edit - unlock: drag to move, right-click switches Current/Overall")
@@ -128,6 +132,8 @@ end
 
 function commands.config() ns.Config.Toggle() end
 function commands.profile() ns.Config.Open("profiles") end
+function commands.widget(rest) ns.WidgetManager.Command(rest) end
+commands.widgets = commands.widget
 function commands.edit() ns.SpellMeter.SetLocked(false) end
 function commands.lock() ns.SpellMeter.SetLocked(true) end
 function commands.session() ns.SpellMeter.ToggleSession() end
@@ -274,5 +280,6 @@ loader:SetScript("OnEvent", function(self, event, name)
     InitDB()
     ns.SpellMeter.Init()
     ns.MinimapButton.Init()
+    ns.WidgetManager.Init()
     ns.Print(("v%s loaded. Type /sm help."):format(ns.VERSION))
 end)

@@ -288,6 +288,11 @@ function T.GetDefault(path)
     return DeepCopy(GetPath(DEFAULT, path))
 end
 
+-- Validate a value against an arbitrary schema entry { path, type, min, max }.
+function T.IsValidEntry(entry, v)
+    return IsValid(entry, v)
+end
+
 function T.IsValidValue(path, v)
     local e = SCHEMA_BY_PATH[path]
     return e ~= nil and IsValid(e, v)

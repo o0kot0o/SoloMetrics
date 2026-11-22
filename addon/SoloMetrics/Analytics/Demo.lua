@@ -55,6 +55,7 @@ function Demo.Start(length, scale)
     ns.SpellMeter.ResetBars()
     ns.SpellMeter.Show()
     ns.SpellMeter.MarkDirty()
+    if ns.WidgetManager then ns.WidgetManager.OnDemoChanged() end
     driver:SetScript("OnUpdate", function(_, elapsed) Step(elapsed) end)
     ns.Print(("DEMO fight started: %ds%s. Numbers are fake. /sm test to stop."):format(
         length, scale > 1 and ", large numbers" or ""))
@@ -67,6 +68,7 @@ function Demo.Stop(reason)
     driver:SetScript("OnUpdate", nil)
     ns.SpellMeter.ResetBars()
     ns.SpellMeter.MarkDirty()
+    if ns.WidgetManager then ns.WidgetManager.OnDemoChanged() end
     ns.Print("DEMO cleared" .. (reason and (" (" .. reason .. ")") or "") .. ".")
 end
 
