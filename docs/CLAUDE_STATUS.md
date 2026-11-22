@@ -1,5 +1,17 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: W5 + W6 — spell context menu and per-fight data (v0.8.0) — awaiting in-game test
+
+- `Core/APIAdapter.lua` — readable completed-fight queries (out of combat only): `SessionList()`, `SessionPlayer(id)`, `SessionSpell(id, spellID)`. Every field passes `Readable`; any secret → nil (no partial data); spellID compared only when readable. Finished sessions cached; newest session never cached (chained pulls); cache cleared on `DAMAGE_METER_RESET`.
+- `Settings/WidgetSchema.lua` — `data.kind` = `live` | `fights`; fights metrics damage / DPS / share (share = spell total ÷ player total per fight, spell widgets only); `spellID` + cached `spellName`; spell widgets forced to `fights`; `WS.Label()`.
+- `UI/GraphRenderer.lua` — `SetSeries(values, max, min)` (readable path).
+- `UI/WidgetManager.lua` — per-fight provider rebuilds after each fight (+0.6 s), on load and on settings change; **exact** auto/focus scale from readable min/max; live sampling, demo and combat-start resets skip per-fight widgets.
+- `UI/SpellContextMenu.lua` (new) + `UI/SpellMeter.lua` — right-click a spell row (meter unlocked): out of combat → menu with Damage per fight / DPS per fight / Share per fight (+ disabled "Live graph for this spell" with explanation, + Open widget list); in combat or DEMO → explanation only. Right-click empty meter space still switches Current/Overall; locked meter remains click-through. New spell widget is created unlocked next to the meter and its settings window opens.
+- Widget window Data section: Source (live / per fight; fixed for spell widgets), metric list depends on source, session only for live.
+**Labeling:** per-fight graphs say "per fight"; live graphs "Average DPS so far" / "Total damage". Never mixed.
+
+---
+
 ## UPDATE 2026-11-22: W4 — per-widget settings windows (v0.7.0) — awaiting in-game test
 
 User request: each widget's options open in a **separate window containing only that widget's settings**; the main config lists widgets with buttons to open them.

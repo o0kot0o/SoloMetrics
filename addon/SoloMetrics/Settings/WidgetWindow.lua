@@ -78,18 +78,46 @@ local function Items(id)
 
     return {
         Sec("Data"),
-        F("data", "metric", "Metric", "enum", { values = Enum(WS().METRICS, WS().METRIC_ORDER),
+        { kind = "note", textFn = function()
+            local d = rec().data
+            if d.spellID then
+                return ("Spell: |cffffffff%s|r (%d). One column per completed fight, from the last %d fights the game keeps. Updates after each fight."):format(
+                    d.spellName or "?", d.spellID, WS().MAX_FIGHTS)
+            elseif d.kind == "fights" then
+                return "One column per completed fight (readable results). Updates after each fight."
+            end
+            return "Live: sampled during combat from the game's running values (hidden from addons, drawn by the game)."
+        end },
+        F("data", "kind", "Source", "enum", {
+            values = { { "live", "Live (during combat)" }, { "fights", "Per fight (last fights)" } },
+            depFn = function() return not rec().data.spellID end,
+            tip = "Spell widgets are always per fight: spell identities are hidden during combat.",
+            after = resetData }),
+        F("data", "metric", "Metric", "enum", {
+            values = function()
+                local d = rec().data
+                if d.kind == "fights" then
+                    local o = {}
+                    for _, k in ipairs(WS().FIGHT_METRIC_ORDER) do
+                        if k ~= "share" or d.spellID then o[#o + 1] = { k, WS().FIGHT_METRICS[k] } end
+                    end
+                    return o
+                end
+                return Enum(WS().METRICS, WS().METRIC_ORDER)
+            end,
             tip = "Average DPS so far = the game's running average (total / time). Total damage only rises during a fight.",
             after = resetData }),
         F("data", "session", "Session", "enum", { values = { { "current", "Current fight" }, { "overall", "Overall" } },
             tip = "Current resets at the start of each fight. Overall keeps adding samples across fights.",
+            depFn = function() return rec().data.kind == "live" end,
             after = resetData }),
 
         Sec("Graph"),
         F("graph", "style", "Graph style", "enum", { values = Enum(WS().STYLES, WS().STYLE_ORDER) }),
-        F("graph", "samples", "Samples shown", "number", { min = 10, max = WS().MAX_SAMPLES, step = 1,
-            tip = "Number of columns. Time window = samples x interval; the oldest drops off." }),
-        F("graph", "interval", "Seconds per sample", "number", { min = 0.5, max = 5, step = 0.5 }),
+        F("graph", "samples", "Columns shown", "number", { min = 10, max = WS().MAX_SAMPLES, step = 1,
+            tip = "Live: number of samples (time window = columns x interval; the oldest drops off). Per fight: up to the last 30 fights." }),
+        F("graph", "interval", "Seconds per sample", "number", { min = 0.5, max = 5, step = 0.5,
+            depFn = function() return rec().data.kind == "live" end }),
         F("graph", "scaleMode", "Scale", "enum", { values = {
             { "auto", "Auto (0 to last fight x 1.5)" },
             { "focus", "Focus (50-150% of last fight)" },

@@ -11,11 +11,20 @@ ns.WidgetSchema = WS
 WS.MAX_WIDGETS = 12
 WS.MAX_SAMPLES = 60
 
+-- Live metrics (opaque samples during combat)
 WS.METRICS = {
     dps = "Average DPS so far",
     damage = "Total damage",
 }
 WS.METRIC_ORDER = { "dps", "damage" }
+-- Per-fight metrics (readable, one point per completed fight)
+WS.FIGHT_METRICS = {
+    damage = "Damage per fight",
+    dps = "DPS per fight",
+    share = "Share of your damage per fight",
+}
+WS.FIGHT_METRIC_ORDER = { "damage", "dps", "share" }
+WS.MAX_FIGHTS = 30 -- the client keeps the last 30 sessions
 WS.STYLES = { area = "Area", bars = "Columns", line = "Line", points = "Points" }
 WS.STYLE_ORDER = { "area", "bars", "line", "points" }
 WS.VISIBILITY = { always = "Always", combat = "In combat", nocombat = "Out of combat", hidden = "Hidden" }
@@ -101,6 +110,41 @@ local function OneOf(v, set, default)
     return default
 end
 
+-- data: { kind = "live"|"fights", metric, session, spellID?, spellName? }
+-- Spell widgets are always "fights" (spell identity is secret in combat).
+function WS.ValidateData(d)
+    d = type(d) == "table" and d or {}
+    local spellID = (type(d.spellID) == "number" and d.spellID > 0 and d.spellID % 1 == 0) and d.spellID or nil
+    local kind = OneOf(d.kind, { live = true, fights = true }, "live")
+    if spellID then kind = "fights" end
+    local metric
+    if kind == "live" then
+        metric = OneOf(d.metric, WS.METRICS, "dps")
+    else
+        metric = OneOf(d.metric, WS.FIGHT_METRICS, "damage")
+        if metric == "share" and not spellID then metric = "damage" end
+    end
+    return {
+        kind = kind,
+        metric = metric,
+        session = OneOf(d.session, { current = true, overall = true }, "current"),
+        spellID = spellID,
+        spellName = (spellID and type(d.spellName) == "string") and d.spellName:sub(1, 64) or nil,
+    }
+end
+
+function WS.Label(w)
+    local d = w.data
+    if d.kind == "fights" then
+        local s = WS.FIGHT_METRICS[d.metric]
+        if d.spellID then s = (d.spellName or ("Spell " .. d.spellID)) .. ": " .. s end
+        return s
+    end
+    local s = WS.METRICS[d.metric]
+    if d.session == "overall" then s = s .. " (overall)" end
+    return s
+end
+
 function WS.ValidateWidget(raw, id)
     if type(raw) ~= "table" or type(id) ~= "string" then return nil end
     if raw.type ~= "graph" then return nil end -- unknown types are dropped, never crash load
@@ -114,11 +158,7 @@ function WS.ValidateWidget(raw, id)
         id = id,
         type = "graph",
         name = name,
-        data = {
-            kind = "live",
-            metric = OneOf(d.metric, WS.METRICS, "dps"),
-            session = OneOf(d.session, { current = true, overall = true }, "current"),
-        },
+        data = WS.ValidateData(d),
         graph = {
             style = OneOf(g.style, WS.STYLES, "area"),
             samples = math.floor(Num(g.samples, 10, WS.MAX_SAMPLES, 30)),
@@ -148,16 +188,21 @@ end
 
 function WS.NewWidget(id, opts)
     opts = opts or {}
-    local metric = OneOf(opts.metric, WS.METRICS, "dps")
-    return WS.ValidateWidget({
+    local data = WS.ValidateData({
+        kind = opts.kind, metric = opts.metric, session = opts.session,
+        spellID = opts.spellID, spellName = opts.spellName,
+    })
+    local w = WS.ValidateWidget({
         type = "graph",
-        name = opts.name or WS.METRICS[metric],
-        data = { metric = metric, session = opts.session },
-        graph = { style = opts.style },
+        name = "Widget",
+        data = data,
+        graph = { style = opts.style or (data.kind == "fights" and "bars" or nil) },
         behavior = {},
         position = opts.position or {},
         appearance = {},
     }, id)
+    w.name = (opts.name or WS.Label(w)):sub(1, 32)
+    return w
 end
 
 -- Validates SoloMetricsDB.widgets in place (non-destructive for valid data).

@@ -67,20 +67,77 @@ local function EffectiveRange(w)
 end
 
 local function MetricLabel(w)
-    local s = WS().METRICS[w.data.metric] or w.data.metric
-    if w.data.session == "overall" then s = s .. " (overall)" end
-    return s
+    return WS().Label(w)
 end
 
 -- v may be secret: native formatting only.
 local function SetValueText(f, w, v)
     if type(v) ~= "number" then
         f.value:SetText("-")
+    elseif w.data.metric == "share" then
+        f.value:SetFormattedText("%.0f%%", v)
     elseif w.data.metric == "damage" then
         f.value:SetText(AbbreviateNumbers(v))
     else
         f.value:SetFormattedText("%.1f", v)
     end
+end
+
+---------------------------------------------------------------------------
+-- Per-fight provider (readable, out of combat only)
+---------------------------------------------------------------------------
+local function FightValue(w, sessionId, newest)
+    local d = w.data
+    if d.spellID then
+        local s = ns.API.SessionSpell(sessionId, d.spellID, newest)
+        if not s then return nil end
+        if d.metric == "share" then
+            return (s.sourceTotal > 0) and (s.total / s.sourceTotal * 100) or 0
+        end
+        return (d.metric == "dps") and s.dps or s.total
+    end
+    local p = ns.API.SessionPlayer(sessionId, newest)
+    if not p then return nil end
+    return (d.metric == "dps") and p.dps or p.total
+end
+
+-- Rebuilds a per-fight widget from the last N completed fights.
+local function RefreshFights(id)
+    local w, f = Rec(id), frames[id]
+    if not (w and f) or w.data.kind ~= "fights" or InCombatLockdown() then return end
+    local list = ns.API.SessionList()
+    if not list then return end
+    local n = math.min(w.graph.samples, #list, WS().MAX_FIGHTS)
+    local values = {}
+    for i = #list - n + 1, #list do
+        local v = FightValue(w, list[i].id, i == #list)
+        if v == nil then return end -- something unreadable: keep the previous graph
+        values[#values + 1] = v
+    end
+    -- exact scale: these are readable values
+    local hi, lo = 0, math.huge
+    for _, v in ipairs(values) do
+        if v > hi then hi = v end
+        if v < lo then lo = v end
+    end
+    if #values == 0 then lo = 0 end
+    local max, min
+    local g = w.graph
+    if g.scaleMode == "fixed" then
+        max, min = g.scaleMax, 0
+    elseif g.scaleMode == "focus" and hi > lo then
+        local pad = (hi - lo) * 0.1
+        max, min = hi + pad, math.max(0, lo - pad)
+    else
+        max, min = math.max(hi * 1.1, 1), 0
+    end
+    f.renderer:SetSeries(values, max, min)
+    SetValueText(f, w, values[#values])
+end
+WM.RefreshFights = RefreshFights
+
+local function RefreshAllFights()
+    for _, id in ipairs(ns.db.widgets.order) do RefreshFights(id) end
 end
 
 ---------------------------------------------------------------------------
@@ -169,6 +226,7 @@ function WM.Apply(id)
     local w = Rec(id)
     if not w then return end
     local f = frames[id] or CreateFrameFor(id)
+    w.data = WS().ValidateData(w.data) -- keep kind/metric/spell consistent after edits
     local get = function(p) return WS().Get(w, p) end
     local pos = w.position
 
@@ -197,7 +255,11 @@ function WM.Apply(id)
 
     f.overlayLabel:SetText(("%s [%s] - drag to move, corner to resize"):format(w.name, w.id))
     f.renderer:ApplyStyle(w)
-    f.renderer:SetScale(EffectiveRange(w))
+    if w.data.kind == "fights" then
+        RefreshFights(id)
+    else
+        f.renderer:SetScale(EffectiveRange(w))
+    end
     ApplyMouse(f, w)
     f:SetShown(ShouldShow(w))
     -- keep open settings UIs in sync (they only refresh, never re-apply)
@@ -208,7 +270,7 @@ end
 function WM.UpdateTitle(id)
     local w, f = Rec(id), frames[id]
     if not (w and f) then return end
-    local demo = ns.Demo.IsActive()
+    local demo = ns.Demo.IsActive() and w.data.kind == "live"
     f.title:SetText(w.name .. (demo and "  |cffff9900DEMO|r" or ""))
 end
 
@@ -233,7 +295,7 @@ local function Tick()
     local snaps = {}
     for _, id in ipairs(DB().order) do
         local w, f = Rec(id), frames[id]
-        if w and f and f:IsShown() then
+        if w and f and f:IsShown() and w.data.kind == "live" then
             f.acc = (f.acc or 0) + TICK
             if f.acc >= w.graph.interval - 0.01 then
                 f.acc = 0
@@ -269,7 +331,7 @@ end
 local function UpdateAutoScale()
     for _, id in ipairs(DB().order) do
         local w, f = Rec(id), frames[id]
-        if w and f then
+        if w and f and w.data.kind == "live" then
             local snap = ns.API.Snapshot(w.data.session)
             local v = (w.data.metric == "damage") and snap.total or snap.dps
             v = ns.SecretSafety.Readable(v)
@@ -286,7 +348,7 @@ end
 
 -- Called by Demo when a DEMO fight starts or is cleared.
 function WM.OnDemoChanged()
-    ResetWidgets()
+    ResetWidgets(function(w) return w.data.kind == "live" end) -- per-fight widgets show real fights only
     for _, id in ipairs(DB().order) do WM.UpdateTitle(id) end
 end
 
@@ -407,7 +469,7 @@ local function Resolve(token)
 end
 
 local HELP = {
-    "/sm widget new [dps|damage] [current|overall] [area|bars|line|points]",
+    "/sm widget new [live|fights] [dps|damage] [current|overall] [area|bars|line|points]",
     "/sm widget list | edit (unlock/lock all)",
     "/sm widget <id> dup | delete | reset | lock | unlock | clickthrough",
     "/sm widget <id> name <text> | style <area|bars|line|points>",
@@ -450,7 +512,8 @@ function WM.Command(rest)
         local opts = {}
         for i = 2, #args do
             local a = args[i]:lower()
-            if WS().METRICS[a] then opts.metric = a
+            if WS().METRICS[a] or WS().FIGHT_METRICS[a] then opts.metric = a
+            elseif a == "fights" or a == "live" then opts.kind = a
             elseif a == "current" or a == "overall" then opts.session = a
             elseif WS().STYLES[a] then opts.style = a end
         end
@@ -592,12 +655,22 @@ function WM.Init()
     ev:SetScript("OnEvent", function(_, event)
         if event == "PLAYER_REGEN_DISABLED" then
             inCombat = true
-            ResetWidgets(function(w) return w.data.session == "current" end)
+            ResetWidgets(function(w) return w.data.kind == "live" and w.data.session == "current" end)
         else
             inCombat = false
             C_Timer.After(0.3, UpdateAutoScale)
+            C_Timer.After(0.6, RefreshAllFights)
         end
         UpdateVisibility()
     end)
     C_Timer.NewTicker(TICK, Tick)
+
+    -- Blizzard meter reset clears every session: drop cached per-fight data.
+    local resetEv = CreateFrame("Frame")
+    pcall(resetEv.RegisterEvent, resetEv, "DAMAGE_METER_RESET")
+    resetEv:SetScript("OnEvent", function()
+        ns.API.ClearCache()
+        C_Timer.After(0.5, RefreshAllFights)
+    end)
+    C_Timer.After(1, RefreshAllFights)
 end

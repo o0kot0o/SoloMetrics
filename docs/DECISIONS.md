@@ -29,5 +29,11 @@ Supersedes the "native picker" part of D-006 / CONFIG_UI_DESIGN decision 3, at t
 ## D-008 — Widget engine data paths (2026-11-22, W1)
 Per the widget-engine directive and `docs/WIDGETS_DESIGN.md`. Three explicitly labeled source kinds: **live** (opaque value pushed each interval into a native StatusBar column; never stored in Lua; limited to player average-DPS-so-far and cumulative damage; pending `/sm graphtest`), **fights** (one readable value per completed session, out of combat), **demo**. Per-interval DPS and per-spell live graphs are declared unsupported (need arithmetic/comparison on secrets). Spell widgets bind a readable spellID captured out of combat. Widget appearance stores overrides only, resolved over user defaults over built-in defaults. 12-widget cap.
 
+## D-009 — Per-widget windows and reusable Panel (2026-11-22)
+User request: each widget's settings in its own window; main config lists widgets with Edit buttons. The control-row system moved from ConfigWindow into `Settings/Panel.lua` (custom item kind with get/set/default/reset) so both windows share one implementation and look identical. Widget appearance edits are overrides; R clears the override.
+
+## D-010 — Spell widgets are per-fight only (2026-11-22)
+Right-click → spell widget captures a readable spellID out of combat. Spell graphs plot one value per completed fight (damage, DPS, share of player damage) because the spell can't be identified in the live list (secret spellID). Per-fight scales use exact readable min/max. Menu shows the live option disabled with the reason.
+
 ## D-004 — Lua safety lint (2026-11-22)
 `Validate-SoloMetrics.ps1` fails on combat-log event usage, `loadstring`/`RunScript`, and any `ResetAllCombatSessions` reference lacking an `SM-ALLOW-RESET` review marker.

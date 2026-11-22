@@ -136,6 +136,21 @@ function R:SetScale(max, min)
     self.axisZero:SetText(min > 0 and FormatAxis(min) or "0")
 end
 
+-- Readable series (one value per completed fight), oldest -> newest.
+function R:SetSeries(values, max, min)
+    self:Reset()
+    self:SetScale(max, min)
+    local n = math.min(#values, self.n)
+    for i = #values - n + 1, #values do
+        self.head = self.head % self.n + 1
+        local b = self.cols[self.head]
+        b:SetMinMaxValues(self.min, self.max)
+        b:SetValue(values[i])
+        self.count = self.count + 1
+    end
+    self:Layout()
+end
+
 -- v may be secret: it only goes into SetValue.
 function R:Push(v)
     if self.n <= 0 or type(v) ~= "number" then return end

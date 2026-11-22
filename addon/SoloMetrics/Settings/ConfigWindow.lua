@@ -232,8 +232,7 @@ local function WidgetEntryRow(p)
         if not w then return end
         local WS = ns.WidgetSchema
         self.name:SetText(w.name .. "  |cff707078" .. id .. "|r")
-        self.info:SetText(("%s%s  -  %s  -  %s%s"):format(WS.METRICS[w.data.metric],
-            w.data.session == "overall" and " (overall)" or "", WS.STYLES[w.graph.style],
+        self.info:SetText(("%s  -  %s  -  %s%s"):format(WS.Label(w), WS.STYLES[w.graph.style],
             WS.VISIBILITY[w.behavior.visibility], w.behavior.locked and "  -  locked" or ""))
         local hidden = w.behavior.visibility == "hidden"
         self.toggle.text:SetText(hidden and "Show" or "Hide")
@@ -270,8 +269,8 @@ local ACTIONS = {
     },
 }
 
-local function CreateWidget(metric, style)
-    local id, err = ns.WidgetManager.Create({ metric = metric, style = style })
+local function CreateWidget(metric, style, kind)
+    local id, err = ns.WidgetManager.Create({ metric = metric, style = style, kind = kind })
     if not id then
         ns.Print(err)
         return
@@ -308,12 +307,14 @@ local function Expand(items)
         elseif k == "widgetlist" then
             local WM, WS = ns.WidgetManager, ns.WidgetSchema
             out[#out + 1] = { kind = "buttons", buttons = {
-                { label = "+ Average DPS graph", width = 160, onClick = function() CreateWidget("dps", "area") end,
+                { label = "+ Live DPS", width = 120, onClick = function() CreateWidget("dps", "area") end,
                   enabled = function() return #WM.List() < WS.MAX_WIDGETS end },
-                { label = "+ Total damage graph", width = 160, onClick = function() CreateWidget("damage", "bars") end,
+                { label = "+ Live damage", width = 130, onClick = function() CreateWidget("damage", "bars") end,
                   enabled = function() return #WM.List() < WS.MAX_WIDGETS end },
-                { label = function() return WM.IsEditAll() and "Lock all widgets" or "Move all widgets" end,
-                  width = 150, onClick = function() WM.SetEditAll(not WM.IsEditAll()) end },
+                { label = "+ DPS per fight", width = 130, onClick = function() CreateWidget("dps", "bars", "fights") end,
+                  enabled = function() return #WM.List() < WS.MAX_WIDGETS end },
+                { label = function() return WM.IsEditAll() and "Lock all" or "Move all" end,
+                  width = 110, onClick = function() WM.SetEditAll(not WM.IsEditAll()) end },
             } }
             out[#out + 1] = { kind = "section", label = ("Your widgets (%d/%d)"):format(#WM.List(), WS.MAX_WIDGETS) }
             if #WM.List() == 0 then

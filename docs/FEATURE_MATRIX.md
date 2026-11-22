@@ -27,8 +27,9 @@ Status values: `SUPPORTED`, `PARTIAL`, `UNSUPPORTED`, `UNTESTED`. A status chang
 | Per-spell damage / DPS | spell_data_* | UNTESTED |
 | Spell share % | spell_data_postcombat_readable + player_totals_postcombat_readable | UNTESTED |
 | Crit / hit / max hit stats | no known source | UNSUPPORTED until a source is found |
-| DPS timeline (live) | sampleable_numeric_dps_live | UNTESTED |
-| Post-fight trend | postcombat_session_history | UNTESTED |
+| DPS timeline (live) | opaque StatusBar columns (graphtest) | SUPPORTED — running-average DPS / cumulative damage, user-confirmed visually; per-interval DPS UNSUPPORTED (secret arithmetic) |
+| Post-fight trend | postcombat_session_history | IMPLEMENTED v0.8.0 (per-fight widgets, last 30 sessions) — awaiting in-game test |
+| Per-spell widgets | readable spellID out of combat | per fight only; live per-spell UNSUPPORTED (secret spellID) |
 | Training dummy interval DPS | interval-specific readable damage | UNTESTED |
 | Pet / combined views | source_owner_attribution, pet_breakdown_reliable | UNTESTED |
 | Profiles persist | savedvariables_persist | UNTESTED |

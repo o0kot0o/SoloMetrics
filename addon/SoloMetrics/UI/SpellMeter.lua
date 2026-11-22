@@ -392,8 +392,17 @@ local function CreateMeter()
         if self.SetUserPlaced then self:SetUserPlaced(false) end
         SavePosition()
     end)
+    -- Right-click a spell row: spell widget menu. Right-click elsewhere:
+    -- switch Current/Overall. (Locked = click-through, so neither fires.)
     frame:SetScript("OnMouseUp", function(_, button)
-        if button == "RightButton" then M.ToggleSession() end
+        if button ~= "RightButton" then return end
+        for i, row in ipairs(rows) do
+            if row:IsShown() and row:IsMouseOver() then
+                M.OnSpellRightClick(i)
+                return
+            end
+        end
+        M.ToggleSession()
     end)
 
     frame.bg = frame:CreateTexture(nil, "BACKGROUND")
@@ -527,6 +536,30 @@ end
 -- Public controls
 ---------------------------------------------------------------------------
 function M.MarkDirty() dirty = true end
+
+-- Captures a READABLE spellID for row i (out of combat only) and opens the
+-- spell widget menu. Never compares or stores a secret value.
+function M.OnSpellRightClick(i)
+    local SCM = ns.SpellContextMenu
+    if ns.Demo.IsActive() then
+        SCM.OpenNotice("Spell widgets", "Stop the DEMO first - spell widgets are built from your real fights.")
+        return
+    end
+    if InCombatLockdown() then
+        SCM.OpenNotice("Spell widgets", "Available after combat. During combat the game hides spell identities from addons, so the spell can't be picked yet.")
+        return
+    end
+    local snap = ns.API.Snapshot(Cfg().session)
+    local sp = snap.spells and snap.spells[i]
+    local id = type(sp) == "table" and ns.SecretSafety.Readable(sp.spellID)
+    if type(id) ~= "number" then
+        SCM.OpenNotice("Spell widgets", "This spell's identity isn't readable right now. Try again in a moment.")
+        return
+    end
+    local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(id)
+    local icon = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(id)
+    SCM.Open(id, ns.SecretSafety.Readable(name), ns.SecretSafety.Readable(icon))
+end
 function M.GetRows() return rows end
 
 -- New fight: empty all bars instantly so reused rows don't show stale values.
