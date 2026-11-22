@@ -258,7 +258,22 @@ end
 function M.ApplyStyle()
     if not frame then return end
     local st = Style()
-    frame:SetScale(st.scale)
+    if math.abs(frame:GetScale() - st.scale) > 0.001 and frame:GetLeft() then
+        -- keep the fixed edge at the same screen position across scale changes
+        -- (anchor offsets are in the frame's own scaled units)
+        local up = Cfg().grow == "up"
+        local es = frame:GetEffectiveScale()
+        local sx = frame:GetLeft() * es
+        local sy = (up and frame:GetBottom() or frame:GetTop()) * es
+        frame:SetScale(st.scale)
+        local ns2 = frame:GetEffectiveScale()
+        local point = up and "BOTTOMLEFT" or "TOPLEFT"
+        frame:ClearAllPoints()
+        frame:SetPoint(point, UIParent, "BOTTOMLEFT", sx / ns2, sy / ns2)
+        Cfg().point = { point, "BOTTOMLEFT", sx / ns2, sy / ns2 }
+    else
+        frame:SetScale(st.scale)
+    end
     frame:SetWidth(st.width)
 
     local c = st.backdrop.color
