@@ -24,6 +24,10 @@ graph widgets, using the client's native `C_DamageMeter` API. No external progra
   - **Per fight**: one column per completed fight (last 30), for you or for a single spell
     (damage, DPS, share of your damage). Right-click a spell in the meter to create one.
   - Styles: area, columns, line, points; grid, scale labels; auto, focus or fixed scale.
+- **Counter widgets** — one big number anywhere on screen: live DPS or damage (current / overall), or
+  last-fight values (including a single spell's damage, DPS or contribution). Optional title, suffix,
+  secondary value (total, DPS, fight time), accent line; presets Minimal number / Compact DPS / Modern panel.
+  Can be a floating number with no background at all.
 - **Grow direction** up or down, scale that keeps its position, click-through lock, `/sm resetui` recovery.
 
 ### What the game allows (and doesn't)

@@ -1,5 +1,21 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: v0.9.0 — Numeric Counter widgets — awaiting in-game test
+
+**Implemented**
+- Widget type `counter` alongside `graph`, sharing ids, manager, frames, drag/resize, lock/click-through, visibility, shared ticker, duplicate/delete, per-widget window, validation. Unknown types still dropped safely; existing graph widgets and defaults unchanged.
+- `Settings/WidgetSchema.lua` — per-type appearance schemas (`SchemaFor`), per-type user defaults (`defaults.appearance` graph / `defaults.counter`), counter record `counter = { interval 0.1–2 s, secondary }`, counter labels, secondary options (none/DPS/damage/time, + share for spell counters), presets **Minimal number / Compact DPS / Modern panel** (override sets, fully editable). 42 counter appearance paths (window, accent, value, title, secondary, layout).
+- `Appearance/Theme.lua` — value types `text` (≤32 chars, no `|`/control), `valign`, `place`, `numfmt`.
+- `UI/CounterRenderer.lua` (new) — anchor-only layout (no text measurement, so it works with secret text). Live path: `SetFormattedText("%.1f"/"%.2f"/"%.0f")`, `AbbreviateNumbers`, `BreakUpLargeNumbers`; secondary uses a literal prefix inside the numeric format string. Readable (last fight) path formats in Lua; spell not used in last fight → "-" + "not used in the last fight".
+- `UI/WidgetManager.lua` — renderer chosen by type; counters update on the shared ticker (per-widget interval), after combat, on settings change; last-fight counters refresh with the per-fight provider.
+- `Settings/WidgetWindow.lua` — counter window: Data, Presets, Primary value, Title, Secondary value, Window, Behaviour, Position & size. Copy appearance / make default restricted to same type.
+- `Settings/Panel.lua` — text-input control.
+- Config Widgets page: + DPS counter / + Damage counter / + Last fight DPS; per-widget Copy (duplicate) button; type shown in list.
+- Spell right-click menu: Counter: damage / DPS / contribution — last fight. Live spell counter shown disabled with reason.
+**Limitations:** no live spell counters (secret spellID); "Short" format on live DPS shows full float precision (native AbbreviateNumbers) → Auto recommended; `%.2f` and `BreakUpLargeNumbers` → SetText on secret values not yet observed in combat; no auto-size (would need measuring secret text).
+
+---
+
 ## MILESTONE SUMMARY 2026-11-22: Widget Engine (W1–W6) — v0.8.0
 
 **Verified working in game (user):** live graph widgets (columns/dots/line follow secret values in combat); per-widget settings windows and Widgets page; focus scale labels; right-click spell → per-fight widget; per-fight graph updates after each fight (after retry fix); no Lua errors.

@@ -1,8 +1,9 @@
 -- SoloMetrics: widget schema (records, appearance overrides, validation)
 -- Widgets live in SoloMetricsDB.widgets = { nextId, order = {ids}, byId = {id -> record},
--- defaults = { appearance = {path -> value} } }.
--- A widget's `appearance` holds ONLY its overrides (flat path -> value).
--- Effective value: widget override -> user defaults -> built-in default.
+-- defaults = { appearance = {graph path -> value}, counter = {counter path -> value} } }.
+-- Types: "graph" and "counter". A widget's `appearance` holds ONLY its overrides
+-- (flat path -> value), validated against its type's schema.
+-- Effective value: widget override -> user defaults for the type -> built-in default.
 
 local _, ns = ...
 local WS = {}
@@ -10,20 +11,27 @@ ns.WidgetSchema = WS
 
 WS.MAX_WIDGETS = 12
 WS.MAX_SAMPLES = 60
+WS.TYPES = { graph = "Graph", counter = "Counter" }
 
--- Live metrics (opaque samples during combat)
+-- Live metrics (opaque values during combat)
 WS.METRICS = {
     dps = "Average DPS so far",
     damage = "Total damage",
 }
 WS.METRIC_ORDER = { "dps", "damage" }
--- Per-fight metrics (readable, one point per completed fight)
+-- Per-fight metrics (readable, completed fights)
 WS.FIGHT_METRICS = {
     damage = "Damage per fight",
     dps = "DPS per fight",
     share = "Share of your damage per fight",
 }
 WS.FIGHT_METRIC_ORDER = { "damage", "dps", "share" }
+-- Counter labels
+WS.COUNTER_LIVE = { dps = "DPS", damage = "Damage" }
+WS.COUNTER_FIGHT = { damage = "Damage (last fight)", dps = "DPS (last fight)", share = "Share (last fight)" }
+WS.SECONDARY = {
+    none = "None", dps = "DPS", damage = "Total damage", time = "Fight time", share = "Share of your damage",
+}
 WS.MAX_FIGHTS = 30 -- the client keeps the last 30 sessions
 WS.STYLES = { area = "Area", bars = "Columns", line = "Line", points = "Points" }
 WS.STYLE_ORDER = { "area", "bars", "line", "points" }
@@ -31,9 +39,9 @@ WS.VISIBILITY = { always = "Always", combat = "In combat", nocombat = "Out of co
 WS.VIS_ORDER = { "always", "combat", "nocombat", "hidden" }
 
 ---------------------------------------------------------------------------
--- Appearance (flat paths; types shared with Theme validation)
+-- Appearance schemas per type (flat paths; types validated by Theme)
 ---------------------------------------------------------------------------
-WS.APPEARANCE_DEFAULTS = {
+local GRAPH_DEFAULTS = {
     ["padding"] = 6,
     ["bg.enabled"] = true, ["bg.color"] = { 0.07, 0.07, 0.08, 0.78 }, ["bg.texture"] = "flat",
     ["border.enabled"] = false, ["border.color"] = { 0, 0, 0, 1 }, ["border.size"] = 1,
@@ -48,8 +56,7 @@ WS.APPEARANCE_DEFAULTS = {
     ["line.thickness"] = 2,
     ["points.enabled"] = true, ["points.size"] = 3, ["points.color"] = { 1, 1, 1, 1 },
 }
-
-WS.APPEARANCE_SCHEMA = {
+local GRAPH_SCHEMA = {
     { "padding", "number", 0, 20 },
     { "bg.enabled", "bool" }, { "bg.color", "color" }, { "bg.texture", "texture" },
     { "border.enabled", "bool" }, { "border.color", "color" }, { "border.size", "number", 1, 8 },
@@ -64,38 +71,111 @@ WS.APPEARANCE_SCHEMA = {
     { "line.thickness", "number", 1, 6 },
     { "points.enabled", "bool" }, { "points.size", "number", 1, 10 }, { "points.color", "color" },
 }
-local SCHEMA_BY_PATH = {}
-for _, e in ipairs(WS.APPEARANCE_SCHEMA) do SCHEMA_BY_PATH[e[1]] = e end
-WS.APPEARANCE_BY_PATH = SCHEMA_BY_PATH
+
+-- Counter default = "Compact DPS" look.
+local COUNTER_DEFAULTS = {
+    ["padding"] = 8, ["spacing"] = 2,
+    ["bg.enabled"] = true, ["bg.color"] = { 0.07, 0.07, 0.08, 0.6 }, ["bg.texture"] = "flat",
+    ["border.enabled"] = false, ["border.color"] = { 0, 0, 0, 1 }, ["border.size"] = 1,
+    ["accent.enabled"] = false, ["accent.classColor"] = true, ["accent.color"] = { 0.25, 0.78, 0.72, 0.9 },
+    ["value.font"] = "default", ["value.size"] = 26, ["value.color"] = { 1, 1, 1, 1 },
+    ["value.classColor"] = false, ["value.outline"] = "none", ["value.shadow"] = true,
+    ["value.align"] = "center", ["value.valign"] = "middle", ["value.x"] = 0, ["value.y"] = -4,
+    ["value.format"] = "auto", ["value.suffix"] = "",
+    ["title.enabled"] = true, ["title.text"] = "", ["title.font"] = "default", ["title.size"] = 10,
+    ["title.color"] = { 0.7, 0.7, 0.75, 1 }, ["title.outline"] = "none", ["title.position"] = "above",
+    ["title.align"] = "center", ["title.x"] = 0, ["title.y"] = 0,
+    ["secondary.enabled"] = false, ["secondary.font"] = "default", ["secondary.size"] = 11,
+    ["secondary.color"] = { 0.75, 0.75, 0.8, 1 }, ["secondary.outline"] = "none",
+    ["secondary.position"] = "below", ["secondary.align"] = "center", ["secondary.label"] = true,
+    ["secondary.x"] = 0, ["secondary.y"] = 0,
+}
+local COUNTER_SCHEMA = {
+    { "padding", "number", 0, 30 }, { "spacing", "number", 0, 30 },
+    { "bg.enabled", "bool" }, { "bg.color", "color" }, { "bg.texture", "texture" },
+    { "border.enabled", "bool" }, { "border.color", "color" }, { "border.size", "number", 1, 8 },
+    { "accent.enabled", "bool" }, { "accent.classColor", "bool" }, { "accent.color", "color" },
+    { "value.font", "font" }, { "value.size", "number", 8, 96 }, { "value.color", "color" },
+    { "value.classColor", "bool" }, { "value.outline", "outline" }, { "value.shadow", "bool" },
+    { "value.align", "align" }, { "value.valign", "valign" },
+    { "value.x", "number", -300, 300 }, { "value.y", "number", -300, 300 },
+    { "value.format", "numfmt" }, { "value.suffix", "text" },
+    { "title.enabled", "bool" }, { "title.text", "text" }, { "title.font", "font" },
+    { "title.size", "number", 6, 40 }, { "title.color", "color" }, { "title.outline", "outline" },
+    { "title.position", "place" }, { "title.align", "align" },
+    { "title.x", "number", -300, 300 }, { "title.y", "number", -300, 300 },
+    { "secondary.enabled", "bool" }, { "secondary.font", "font" }, { "secondary.size", "number", 6, 40 },
+    { "secondary.color", "color" }, { "secondary.outline", "outline" }, { "secondary.position", "place" },
+    { "secondary.align", "align" }, { "secondary.label", "bool" },
+    { "secondary.x", "number", -300, 300 }, { "secondary.y", "number", -300, 300 },
+}
+
+local function Index(schema)
+    local t = {}
+    for _, e in ipairs(schema) do t[e[1]] = e end
+    return t
+end
+local SCHEMAS = {
+    graph = { defaults = GRAPH_DEFAULTS, list = GRAPH_SCHEMA, byPath = Index(GRAPH_SCHEMA), dbKey = "appearance" },
+    counter = { defaults = COUNTER_DEFAULTS, list = COUNTER_SCHEMA, byPath = Index(COUNTER_SCHEMA), dbKey = "counter" },
+}
+-- compatibility aliases (graph)
+WS.APPEARANCE_DEFAULTS = GRAPH_DEFAULTS
+WS.APPEARANCE_SCHEMA = GRAPH_SCHEMA
+WS.APPEARANCE_BY_PATH = SCHEMAS.graph.byPath
+
+function WS.SchemaFor(wtype) return SCHEMAS[wtype] or SCHEMAS.graph end
+
+-- Counter presets: override sets (applied as the widget's appearance).
+WS.COUNTER_PRESET_ORDER = { "minimal", "compact", "panel" }
+WS.COUNTER_PRESETS = {
+    minimal = { label = "Minimal number", overrides = {
+        ["bg.enabled"] = false, ["border.enabled"] = false, ["accent.enabled"] = false,
+        ["title.enabled"] = false, ["secondary.enabled"] = false,
+        ["value.outline"] = "outline", ["value.y"] = 0,
+    } },
+    compact = { label = "Compact DPS", overrides = {} },
+    panel = { label = "Modern panel", overrides = {
+        ["bg.color"] = { 0.07, 0.07, 0.08, 0.85 }, ["border.enabled"] = true,
+        ["border.color"] = { 0.2, 0.2, 0.23, 1 }, ["accent.enabled"] = true,
+        ["title.position"] = "top", ["title.size"] = 11, ["value.size"] = 28, ["value.y"] = 0,
+        ["secondary.enabled"] = true, ["secondary.position"] = "bottom",
+    } },
+}
 
 local function CopyValue(v)
     if type(v) == "table" then return { v[1], v[2], v[3], v[4] or 1 } end
     return v
 end
 
-function WS.IsValidAppearance(path, v)
-    local e = SCHEMA_BY_PATH[path]
+function WS.IsValidAppearance(path, v, wtype)
+    local e = WS.SchemaFor(wtype).byPath[path]
     return e ~= nil and ns.Theme.IsValidEntry(e, v)
 end
 
--- Keep only known paths with valid values.
-function WS.CleanAppearance(map)
+-- Keep only known paths with valid values for the type.
+function WS.CleanAppearance(map, wtype)
     local out = {}
     if type(map) ~= "table" then return out end
     for path, v in pairs(map) do
-        if type(path) == "string" and WS.IsValidAppearance(path, v) then
+        if type(path) == "string" and WS.IsValidAppearance(path, v, wtype) then
             out[path] = CopyValue(v)
         end
     end
     return out
 end
 
+function WS.UserDefaults(wtype)
+    local s = WS.SchemaFor(wtype)
+    return ns.db.widgets.defaults[s.dbKey]
+end
+
 function WS.Get(w, path)
     local v = w.appearance[path]
     if v ~= nil then return v end
-    local d = ns.db.widgets.defaults.appearance[path]
+    local d = WS.UserDefaults(w.type)[path]
     if d ~= nil then return d end
-    return WS.APPEARANCE_DEFAULTS[path]
+    return WS.SchemaFor(w.type).defaults[path]
 end
 
 ---------------------------------------------------------------------------
@@ -133,33 +213,65 @@ function WS.ValidateData(d)
     }
 end
 
+-- Valid secondary metrics for a widget's data.
+function WS.SecondaryOptions(data)
+    local o = { "none", "dps", "damage", "time" }
+    if data.kind == "fights" and data.spellID then o[#o + 1] = "share" end
+    return o
+end
+
 function WS.Label(w)
     local d = w.data
-    if d.kind == "fights" then
-        local s = WS.FIGHT_METRICS[d.metric]
-        if d.spellID then s = (d.spellName or ("Spell " .. d.spellID)) .. ": " .. s end
-        return s
+    local spell = d.spellID and ((d.spellName or ("Spell " .. d.spellID)) .. ": ") or ""
+    if w.type == "counter" then
+        if d.kind == "fights" then return spell .. WS.COUNTER_FIGHT[d.metric] end
+        return WS.COUNTER_LIVE[d.metric] .. (d.session == "overall" and " (overall)" or "")
     end
-    local s = WS.METRICS[d.metric]
-    if d.session == "overall" then s = s .. " (overall)" end
-    return s
+    if d.kind == "fights" then return spell .. WS.FIGHT_METRICS[d.metric] end
+    return WS.METRICS[d.metric] .. (d.session == "overall" and " (overall)" or "")
 end
 
 function WS.ValidateWidget(raw, id)
     if type(raw) ~= "table" or type(id) ~= "string" then return nil end
-    if raw.type ~= "graph" then return nil end -- unknown types are dropped, never crash load
+    local wtype = (raw.type == "graph" or raw.type == "counter") and raw.type or nil
+    if not wtype then return nil end -- unknown types are dropped, never crash load
     local d = type(raw.data) == "table" and raw.data or {}
-    local g = type(raw.graph) == "table" and raw.graph or {}
     local b = type(raw.behavior) == "table" and raw.behavior or {}
     local p = type(raw.position) == "table" and raw.position or {}
     local name = type(raw.name) == "string" and strtrim(raw.name) or ""
     if name == "" or #name > 32 then name = "Widget" end
-    return {
+    local isCounter = wtype == "counter"
+    local w = {
         id = id,
-        type = "graph",
+        type = wtype,
         name = name,
         data = WS.ValidateData(d),
-        graph = {
+        behavior = {
+            visibility = OneOf(b.visibility, WS.VISIBILITY, "always"),
+            locked = b.locked == true,
+            clickThrough = b.clickThrough == true,
+        },
+        position = {
+            x = Num(p.x, -10000, 10000, 300),
+            y = Num(p.y, -10000, 10000, 500),
+            width = Num(p.width, isCounter and 40 or 120, 900, isCounter and 170 or 260),
+            height = Num(p.height, isCounter and 20 or 60, 500, isCounter and 70 or 120),
+            scale = Num(p.scale, 0.5, 2, 1),
+        },
+        appearance = WS.CleanAppearance(raw.appearance, wtype),
+    }
+    if isCounter then
+        local c = type(raw.counter) == "table" and raw.counter or {}
+        local sec = OneOf(c.secondary, WS.SECONDARY, "none")
+        local okSec = false
+        for _, k in ipairs(WS.SecondaryOptions(w.data)) do if k == sec then okSec = true end end
+        w.counter = {
+            interval = Num(c.interval, 0.1, 2, 0.2),
+            secondary = okSec and sec or "none",
+        }
+    else
+        local g = type(raw.graph) == "table" and raw.graph or {}
+        w.graph = {
             style = OneOf(g.style, WS.STYLES, "area"),
             samples = math.floor(Num(g.samples, 10, WS.MAX_SAMPLES, 30)),
             interval = Num(g.interval, 0.5, 5, 1),
@@ -169,50 +281,47 @@ function WS.ValidateWidget(raw, id)
             scaleMax = Num(g.scaleMax, 1, 1e9, 100),
             autoMax = (type(g.autoMax) == "number" and g.autoMax > 0) and g.autoMax or nil,
             autoBase = (type(g.autoBase) == "number" and g.autoBase > 0) and g.autoBase or nil,
-        },
-        behavior = {
-            visibility = OneOf(b.visibility, WS.VISIBILITY, "always"),
-            locked = b.locked == true,
-            clickThrough = b.clickThrough == true,
-        },
-        position = {
-            x = Num(p.x, -10000, 10000, 300),
-            y = Num(p.y, -10000, 10000, 500),
-            width = Num(p.width, 120, 900, 260),
-            height = Num(p.height, 60, 500, 120),
-            scale = Num(p.scale, 0.5, 2, 1),
-        },
-        appearance = WS.CleanAppearance(raw.appearance),
-    }
+        }
+    end
+    return w
 end
 
 function WS.NewWidget(id, opts)
     opts = opts or {}
+    local wtype = (opts.type == "counter") and "counter" or "graph"
     local data = WS.ValidateData({
         kind = opts.kind, metric = opts.metric, session = opts.session,
         spellID = opts.spellID, spellName = opts.spellName,
     })
     local w = WS.ValidateWidget({
-        type = "graph",
+        type = wtype,
         name = "Widget",
         data = data,
         graph = { style = opts.style or (data.kind == "fights" and "bars" or nil) },
+        counter = { secondary = opts.secondary },
         behavior = {},
         position = opts.position or {},
         appearance = {},
     }, id)
     w.name = (opts.name or WS.Label(w)):sub(1, 32)
+    if wtype == "counter" and opts.preset and WS.COUNTER_PRESETS[opts.preset] then
+        w.appearance = WS.CleanAppearance(WS.COUNTER_PRESETS[opts.preset].overrides, "counter")
+    end
     return w
 end
 
 -- Validates SoloMetricsDB.widgets in place (non-destructive for valid data).
 function WS.ValidateAll(db)
     local src = type(db.widgets) == "table" and db.widgets or {}
+    local sd = type(src.defaults) == "table" and src.defaults or {}
     local out = {
         nextId = math.floor(Num(src.nextId, 1, 1e9, 1)),
         order = {},
         byId = {},
-        defaults = { appearance = WS.CleanAppearance(src.defaults and src.defaults.appearance) },
+        defaults = {
+            appearance = WS.CleanAppearance(sd.appearance, "graph"),
+            counter = WS.CleanAppearance(sd.counter, "counter"),
+        },
     }
     local seen = {}
     if type(src.order) == "table" and type(src.byId) == "table" then

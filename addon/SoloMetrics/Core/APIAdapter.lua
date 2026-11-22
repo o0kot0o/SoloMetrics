@@ -140,7 +140,7 @@ function A.SessionSpell(id, spellID, noCache)
     local MT = Enum.DamageMeterType
     local ok, ps = pcall(C_DamageMeter.GetCombatSessionSourceFromID, id, MT.DamageDone, UnitGUID("player"))
     if not ok then return nil end
-    local r = { total = 0, dps = 0, sourceTotal = 0 }
+    local r = { total = 0, dps = 0, sourceTotal = 0, found = false }
     if type(ps) == "table" then
         local st = S.Readable(ps.totalAmount)
         if type(st) ~= "number" then return nil end
@@ -154,7 +154,7 @@ function A.SessionSpell(id, spellID, noCache)
                 if sid == spellID then
                     local t, d = S.Readable(sp.totalAmount), S.Readable(sp.amountPerSecond)
                     if type(t) ~= "number" or type(d) ~= "number" then return nil end
-                    r.total, r.dps = t, d
+                    r.total, r.dps, r.found = t, d, true
                     break
                 end
             end

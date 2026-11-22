@@ -392,6 +392,26 @@ C.color = function(panel)
     return row
 end
 
+C.text = function(panel)
+    local row = SettingRow(panel, "text", 28)
+    row.edit = W().Edit(row, 220)
+    row.edit:SetPoint("LEFT", CONTROL_X, 0)
+    row.edit:SetMaxLetters(32)
+    row.edit.onCommit = function(text)
+        text = strtrim(text or "")
+        if not panel:Set(row.item, text) then
+            ns.Print("Text can't contain '|' and must be at most 32 characters.")
+        end
+    end
+    row.edit.onRevert = function() row:Refresh() end
+    row.inputs = { row.edit }
+    function row:Refresh()
+        if not self.edit:HasFocus() then self.edit:SetText(GetValue(self.item) or "") end
+        self:SetEnabledState(DepOK(self.item))
+    end
+    return row
+end
+
 C.section = function(panel)
     local w = W()
     local A = w.ACCENT
@@ -555,6 +575,7 @@ local function ControlKind(item)
     if t == "bool" then return "toggle" end
     if t == "number" then return "slider" end
     if t == "color" then return "color" end
+    if t == "text" then return "text" end
     return "dropdown"
 end
 

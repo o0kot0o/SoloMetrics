@@ -35,5 +35,8 @@ User request: each widget's settings in its own window; main config lists widget
 ## D-010 — Spell widgets are per-fight only (2026-11-22)
 Right-click → spell widget captures a readable spellID out of combat. Spell graphs plot one value per completed fight (damage, DPS, share of player damage) because the spell can't be identified in the live list (secret spellID). Per-fight scales use exact readable min/max. Menu shows the live option disabled with the reason.
 
+## D-011 — Counter widgets (2026-11-22, v0.9.0)
+Second widget type sharing the widget engine. Per-type appearance schemas and user defaults. Counters render with anchors only (no string measurement → safe with secret text); live formats limited to native numeric formatting; last-fight counters (readable) format freely. Spell counters show the last completed fight only (same reason as D-010). No auto-size: it would require measuring secret text.
+
 ## D-004 — Lua safety lint (2026-11-22)
 `Validate-SoloMetrics.ps1` fails on combat-log event usage, `loadstring`/`RunScript`, and any `ResetAllCombatSessions` reference lacking an `SM-ALLOW-RESET` review marker.

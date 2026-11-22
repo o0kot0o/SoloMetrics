@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: SoloMetrics
 ## Notes: Personal solo damage meter for WoW: Forever
-## Version: 0.8.0
+## Version: 0.9.0
 ## SavedVariables: SoloMetricsDB
 ## Category: Combat
 ## IconTexture: Interface\AddOns\SoloMetrics\Assets\Icons\SoloMetrics_AddonIcon
@@ -21,6 +21,7 @@ UI\MinimapButton.lua
 Settings\Profiles.lua
 Settings\WidgetSchema.lua
 UI\GraphRenderer.lua
+UI\CounterRenderer.lua
 UI\WidgetManager.lua
 UI\SpellContextMenu.lua
 Settings\ConfigRegistry.lua

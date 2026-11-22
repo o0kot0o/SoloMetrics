@@ -47,13 +47,14 @@ local function Items(id)
 
     -- appearance override
     local function AP(path, label, extra)
-        local e = WS().APPEARANCE_BY_PATH[path]
+        local wtype = rec().type
+        local e = WS().SchemaFor(wtype).byPath[path]
         local it = {
             kind = "custom", type = e[2], min = e[3], max = e[4], label = label, path = path,
             get = function() return WS().Get(rec(), path) end,
             set = function(v)
                 if type(v) == "table" then v = { v[1], v[2], v[3], v[4] or 1 } end
-                if not WS().IsValidAppearance(path, v) then return false end
+                if not WS().IsValidAppearance(path, v, wtype) then return false end
                 rec().appearance[path] = v
                 apply()
                 return true
@@ -71,9 +72,149 @@ local function Items(id)
     local function Sec(label) return { kind = "section", label = label } end
 
     local function resetData()
-        rec().graph.autoMax = nil
-        rec().graph.autoBase = nil
+        local g = rec().graph
+        if g then
+            g.autoMax = nil
+            g.autoBase = nil
+        end
         WM().ResetGraph(id)
+    end
+    local function NotPlaced(path) -- label alignment only applies at a window edge
+        return function()
+            local p = WS().Get(rec(), path)
+            return p == "top" or p == "bottom"
+        end
+    end
+
+    if rec().type == "counter" then
+        local PLACES = { { "above", "Above the value" }, { "below", "Below the value" },
+                         { "top", "Top edge of window" }, { "bottom", "Bottom edge of window" } }
+        local function MetricValues()
+            local d = rec().data
+            if d.kind == "fights" then
+                local o = {}
+                for _, k in ipairs(WS().FIGHT_METRIC_ORDER) do
+                    if k ~= "share" or d.spellID then o[#o + 1] = { k, WS().COUNTER_FIGHT[k] } end
+                end
+                return o
+            end
+            return { { "dps", "DPS" }, { "damage", "Damage" } }
+        end
+        local function SecondaryValues()
+            local o = {}
+            for _, k in ipairs(WS().SecondaryOptions(rec().data)) do o[#o + 1] = { k, WS().SECONDARY[k] } end
+            return o
+        end
+        local presetButtons = {}
+        for _, key in ipairs(WS().COUNTER_PRESET_ORDER) do
+            local p = WS().COUNTER_PRESETS[key]
+            presetButtons[#presetButtons + 1] = { label = p.label, width = 150, onClick = function()
+                rec().appearance = WS().CleanAppearance(p.overrides, "counter")
+                if key == "panel" and rec().counter.secondary == "none" then
+                    rec().counter.secondary = (rec().data.metric == "dps") and "damage" or "dps"
+                end
+                apply()
+            end }
+        end
+        return {
+            Sec("Data"),
+            { kind = "note", textFn = function()
+                local d = rec().data
+                if d.spellID then
+                    return ("Spell: |cffffffff%s|r (%d). Shows the LAST COMPLETED FIGHT (spell identities are hidden during combat, so a live spell counter isn't possible). Updates after each fight."):format(
+                        d.spellName or "?", d.spellID)
+                elseif d.kind == "fights" then
+                    return "Shows the last completed fight (readable). Updates after each fight."
+                end
+                return "Live: updates during combat; the number is drawn by the game (hidden from addons)."
+            end },
+            F("data", "kind", "Source", "enum", {
+                values = { { "live", "Live (during combat)" }, { "fights", "Last completed fight" } },
+                depFn = function() return not rec().data.spellID end,
+                tip = "Spell counters always show the last completed fight.", after = resetData }),
+            F("data", "metric", "Value", "enum", { values = MetricValues, after = resetData }),
+            F("data", "session", "Session", "enum", {
+                values = { { "current", "Current fight" }, { "overall", "Overall" } },
+                depFn = function() return rec().data.kind == "live" end, after = resetData }),
+            F("counter", "secondary", "Secondary value", "enum", { values = SecondaryValues,
+                tip = "A smaller second statistic, e.g. total damage under a DPS number." }),
+            F("counter", "interval", "Update every (seconds)", "number", { min = 0.1, max = 2, step = 0.1,
+                depFn = function() return rec().data.kind == "live" end }),
+
+            Sec("Presets"),
+            { kind = "buttons", buttons = presetButtons },
+
+            Sec("Primary value"),
+            AP("value.size", "Size", { step = 1 }),
+            AP("value.font", "Font"),
+            AP("value.color", "Color"),
+            AP("value.classColor", "Use class color"),
+            AP("value.outline", "Outline"),
+            AP("value.shadow", "Shadow"),
+            AP("value.format", "Number format", { type = "enum", values = {
+                { "auto", "Auto (DPS 1 decimal, damage short)" }, { "compact", "Short (12.3K)" },
+                { "full", "Full (12,345)" }, { "decimal1", "One decimal" }, { "decimal2", "Two decimals" } },
+                tip = "Live values are formatted by the game. 'Short' shows small decimals at full precision, so Auto is recommended for DPS." }),
+            AP("value.suffix", "Suffix text", { tip = "Optional, e.g. DPS. Shown smaller to the right of the number." }),
+            AP("value.align", "Horizontal position"),
+            AP("value.valign", "Vertical position", { type = "enum", values = {
+                { "top", "Top" }, { "middle", "Middle" }, { "bottom", "Bottom" } } }),
+            AP("value.x", "Offset X", { step = 1, adv = true }),
+            AP("value.y", "Offset Y", { step = 1, adv = true }),
+
+            Sec("Title"),
+            AP("title.enabled", "Show title"),
+            AP("title.text", "Title text", { depFn = On("title.enabled"),
+                tip = "Leave empty to use the automatic label (e.g. 'DPS' or 'Auto Shot: Damage (last fight)')." }),
+            AP("title.position", "Position", { depFn = On("title.enabled"), type = "enum", values = PLACES }),
+            AP("title.align", "Alignment", { depFn = function() return On("title.enabled")() and NotPlaced("title.position")() end,
+                tip = "Used when the title sits at a window edge; otherwise it follows the value." }),
+            AP("title.font", "Font", { depFn = On("title.enabled") }),
+            AP("title.size", "Size", { depFn = On("title.enabled"), step = 1 }),
+            AP("title.color", "Color", { depFn = On("title.enabled") }),
+            AP("title.outline", "Outline", { depFn = On("title.enabled"), adv = true }),
+            AP("title.x", "Offset X", { depFn = On("title.enabled"), step = 1, adv = true }),
+            AP("title.y", "Offset Y", { depFn = On("title.enabled"), step = 1, adv = true }),
+
+            Sec("Secondary value"),
+            AP("secondary.enabled", "Show secondary value", { tip = "Also pick which statistic under Data." }),
+            AP("secondary.label", "Show label (e.g. 'Total:')", { depFn = On("secondary.enabled") }),
+            AP("secondary.position", "Position", { depFn = On("secondary.enabled"), type = "enum", values = PLACES }),
+            AP("secondary.align", "Alignment", { depFn = function() return On("secondary.enabled")() and NotPlaced("secondary.position")() end }),
+            AP("secondary.font", "Font", { depFn = On("secondary.enabled") }),
+            AP("secondary.size", "Size", { depFn = On("secondary.enabled"), step = 1 }),
+            AP("secondary.color", "Color", { depFn = On("secondary.enabled") }),
+            AP("secondary.outline", "Outline", { depFn = On("secondary.enabled"), adv = true }),
+            AP("secondary.x", "Offset X", { depFn = On("secondary.enabled"), step = 1, adv = true }),
+            AP("secondary.y", "Offset Y", { depFn = On("secondary.enabled"), step = 1, adv = true }),
+
+            Sec("Window"),
+            AP("bg.enabled", "Show background"),
+            AP("bg.color", "Background color", { depFn = On("bg.enabled") }),
+            AP("bg.texture", "Background texture", { depFn = On("bg.enabled") }),
+            AP("border.enabled", "Show border"),
+            AP("border.color", "Border color", { depFn = On("border.enabled") }),
+            AP("border.size", "Border thickness", { depFn = On("border.enabled"), step = 1 }),
+            AP("accent.enabled", "Accent line (top)"),
+            AP("accent.classColor", "Accent uses class color", { depFn = On("accent.enabled") }),
+            AP("accent.color", "Accent color", { depFn = On("accent.enabled") }),
+            AP("padding", "Inner padding", { step = 1, adv = true }),
+            AP("spacing", "Spacing between texts", { step = 1, adv = true }),
+
+            Sec("Behaviour"),
+            F("behavior", "visibility", "Show", "enum", { values = Enum(WS().VISIBILITY, WS().VIS_ORDER) }),
+            F("behavior", "locked", "Locked", "bool"),
+            F("behavior", "clickThrough", "Click-through when locked", "bool",
+                { depFn = function() return rec().behavior.locked end }),
+
+            Sec("Position & size"),
+            F("position", "width", "Width", "number", { min = 40, max = 900, step = 1 }),
+            F("position", "height", "Height", "number", { min = 20, max = 500, step = 1 }),
+            F("position", "scale", "Scale", "number", { min = 0.5, max = 2, step = 0.05 }),
+            { kind = "buttons", buttons = {
+                { label = "Reset position", width = 140, onClick = function() WM().ResetPosition(id) end },
+            } },
+        }
     end
 
     return {
@@ -291,19 +432,20 @@ local function Build(id)
     f.copyBtn = Btn("Copy appearance from...", 180, 12, -46, function(self)
         local opts = {}
         for _, oid in ipairs(WM().List()) do
-            if oid ~= id then
+            if oid ~= id and WM().Get(oid).type == WM().Get(id).type then
                 local o = WM().Get(oid)
                 opts[#opts + 1] = { value = oid, label = o.name .. "  (" .. oid .. ")" }
             end
         end
-        if #opts == 0 then ns.Print("No other widgets to copy from.") return end
+        if #opts == 0 then ns.Print("No other widgets of this type to copy from.") return end
         w.OpenList(self, opts, nil, function(src)
             WM().Get(id).appearance = ns.Theme.DeepCopy(WM().Get(src).appearance)
             WM().Apply(id)
         end)
     end)
     Btn("Use as default for new widgets", 210, 200, -46, function()
-        ns.db.widgets.defaults.appearance = ns.Theme.DeepCopy(WM().Get(id).appearance)
+        local rec = WM().Get(id)
+        ns.db.widgets.defaults[WS().SchemaFor(rec.type).dbKey] = ns.Theme.DeepCopy(rec.appearance)
         WM().ApplyAll()
         ns.Print("This widget's appearance is now the default for widgets without their own overrides.")
     end)

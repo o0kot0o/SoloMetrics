@@ -35,6 +35,16 @@ end
 
 T.OUTLINES = { none = "", outline = "OUTLINE", thick = "THICKOUTLINE" }
 T.ALIGNS = { left = "LEFT", center = "CENTER", right = "RIGHT" }
+-- widget-only value types
+T.VALIGNS = { top = true, middle = true, bottom = true }
+T.PLACES = { above = true, below = true, top = true, bottom = true }
+T.NUMFMTS = { auto = true, compact = true, full = true, decimal1 = true, decimal2 = true }
+
+-- Free text (titles, suffixes): short, no escape/control characters.
+local function ValidText(v)
+    return type(v) == "string" and #v <= 32 and not v:find("[%c|]")
+end
+T.ValidText = ValidText
 
 function T.FontPath(key)
     local f = T.FONTS[key] or T.FONTS.default
@@ -206,6 +216,10 @@ local function IsValid(entry, v)
     if t == "texture" then return type(v) == "string" and T.TEXTURES[v] ~= nil end
     if t == "outline" then return type(v) == "string" and T.OUTLINES[v] ~= nil end
     if t == "align" then return type(v) == "string" and T.ALIGNS[v] ~= nil end
+    if t == "valign" then return type(v) == "string" and T.VALIGNS[v] ~= nil end
+    if t == "place" then return type(v) == "string" and T.PLACES[v] ~= nil end
+    if t == "numfmt" then return type(v) == "string" and T.NUMFMTS[v] ~= nil end
+    if t == "text" then return ValidText(v) end
     return false
 end
 

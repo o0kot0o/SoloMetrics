@@ -137,9 +137,9 @@ local function OpenWidgetList()
     ns.Config.Open("widgets")
 end
 
-local function CreateSpellWidget(spellID, spellName, metric)
+local function CreateSpellWidget(spellID, spellName, metric, wtype)
     local id, err = ns.WidgetManager.Create({
-        kind = "fights", metric = metric, spellID = spellID, spellName = spellName, style = "bars",
+        type = wtype, kind = "fights", metric = metric, spellID = spellID, spellName = spellName, style = "bars",
     })
     if not id then
         ns.Print(err)
@@ -161,15 +161,21 @@ function SCM.Open(spellID, spellName, icon)
     local full = #ns.WidgetManager.List() >= ns.WidgetSchema.MAX_WIDGETS
     local limitTip = full and ("Widget limit reached (" .. ns.WidgetSchema.MAX_WIDGETS .. ").") or nil
     local name = spellName or ("Spell " .. spellID)
-    Show(name, icon, "Create spell widget (per fight, last 30 fights)", nil, {
-        { "Damage per fight graph", disabled = full, tip = limitTip,
-          run = function() CreateSpellWidget(spellID, name, "damage") end },
-        { "DPS per fight graph", disabled = full, tip = limitTip,
-          run = function() CreateSpellWidget(spellID, name, "dps") end },
-        { "Share of your damage per fight", disabled = full, tip = limitTip,
-          run = function() CreateSpellWidget(spellID, name, "share") end },
-        { "Live graph for this spell", disabled = true,
-          tip = "Not possible: spell identities are hidden from addons during combat, so a single spell can't be picked out of the live list. Per-fight graphs use each fight's readable results instead." },
+    Show(name, icon, "Create spell widget (completed fights)", nil, {
+        { "Graph: damage per fight", disabled = full, tip = limitTip,
+          run = function() CreateSpellWidget(spellID, name, "damage", "graph") end },
+        { "Graph: DPS per fight", disabled = full, tip = limitTip,
+          run = function() CreateSpellWidget(spellID, name, "dps", "graph") end },
+        { "Graph: share of your damage per fight", disabled = full, tip = limitTip,
+          run = function() CreateSpellWidget(spellID, name, "share", "graph") end },
+        { "Counter: damage - last fight", disabled = full, tip = limitTip,
+          run = function() CreateSpellWidget(spellID, name, "damage", "counter") end },
+        { "Counter: DPS - last fight", disabled = full, tip = limitTip,
+          run = function() CreateSpellWidget(spellID, name, "dps", "counter") end },
+        { "Counter: contribution - last fight", disabled = full, tip = limitTip,
+          run = function() CreateSpellWidget(spellID, name, "share", "counter") end },
+        { "Live graph / counter for this spell", disabled = true,
+          tip = "Not possible: spell identities are hidden from addons during combat, so a single spell can't be picked out of the live list. Spell widgets use each fight's readable results instead." },
         { "Open widget list", run = OpenWidgetList },
     })
 end

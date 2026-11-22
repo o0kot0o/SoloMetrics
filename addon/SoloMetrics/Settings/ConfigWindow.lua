@@ -219,21 +219,28 @@ local function WidgetEntryRow(p)
     row.name:SetPoint("TOPLEFT", LX() + 4, -8)
     row.info = W.Text(row, 10, { 0.6, 0.6, 0.65, 1 })
     row.info:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
-    row.edit = W.Button(row, 80, 22, "Edit")
+    row.edit = W.Button(row, 64, 22, "Edit")
     row.edit.text:SetTextColor(A[1], A[2], A[3], 1)
-    row.toggle = W.Button(row, 70, 22, "")
-    row.delete = W.Button(row, 70, 22, "Delete")
+    row.dup = W.Button(row, 50, 22, "Copy")
+    row.toggle = W.Button(row, 56, 22, "")
+    row.delete = W.Button(row, 60, 22, "Delete")
     row.delete:SetPoint("RIGHT", -12, 0)
     row.toggle:SetPoint("RIGHT", row.delete, "LEFT", -6, 0)
-    row.edit:SetPoint("RIGHT", row.toggle, "LEFT", -6, 0)
+    row.dup:SetPoint("RIGHT", row.toggle, "LEFT", -6, 0)
+    row.edit:SetPoint("RIGHT", row.dup, "LEFT", -6, 0)
     function row:Refresh()
         local id = self.item.widgetId
         local w = ns.WidgetManager.Get(id)
         if not w then return end
         local WS = ns.WidgetSchema
         self.name:SetText(w.name .. "  |cff707078" .. id .. "|r")
-        self.info:SetText(("%s  -  %s  -  %s%s"):format(WS.Label(w), WS.STYLES[w.graph.style],
+        local kindText = (w.type == "graph") and (WS.STYLES[w.graph.style] .. " graph") or "Counter"
+        self.info:SetText(("%s  -  %s  -  %s%s"):format(kindText, WS.Label(w),
             WS.VISIBILITY[w.behavior.visibility], w.behavior.locked and "  -  locked" or ""))
+        self.dup:SetScript("OnClick", function()
+            local nid, err = ns.WidgetManager.Duplicate(id)
+            if not nid then ns.Print(err) end
+        end)
         local hidden = w.behavior.visibility == "hidden"
         self.toggle.text:SetText(hidden and "Show" or "Hide")
         self.edit:SetScript("OnClick", function() ns.WidgetWindow.Open(id) end)
@@ -269,8 +276,8 @@ local ACTIONS = {
     },
 }
 
-local function CreateWidget(metric, style, kind)
-    local id, err = ns.WidgetManager.Create({ metric = metric, style = style, kind = kind })
+local function CreateWidget(metric, style, kind, wtype)
+    local id, err = ns.WidgetManager.Create({ metric = metric, style = style, kind = kind, type = wtype })
     if not id then
         ns.Print(err)
         return
@@ -315,6 +322,17 @@ local function Expand(items)
                   enabled = function() return #WM.List() < WS.MAX_WIDGETS end },
                 { label = function() return WM.IsEditAll() and "Lock all" or "Move all" end,
                   width = 110, onClick = function() WM.SetEditAll(not WM.IsEditAll()) end },
+            } }
+            out[#out + 1] = { kind = "buttons", buttons = {
+                { label = "+ DPS counter", width = 120,
+                  onClick = function() CreateWidget("dps", nil, nil, "counter") end,
+                  enabled = function() return #WM.List() < WS.MAX_WIDGETS end },
+                { label = "+ Damage counter", width = 130,
+                  onClick = function() CreateWidget("damage", nil, nil, "counter") end,
+                  enabled = function() return #WM.List() < WS.MAX_WIDGETS end },
+                { label = "+ Last fight DPS", width = 130,
+                  onClick = function() CreateWidget("dps", nil, "fights", "counter") end,
+                  enabled = function() return #WM.List() < WS.MAX_WIDGETS end },
             } }
             out[#out + 1] = { kind = "section", label = ("Your widgets (%d/%d)"):format(#WM.List(), WS.MAX_WIDGETS) }
             if #WM.List() == 0 then

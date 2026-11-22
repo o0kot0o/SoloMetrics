@@ -86,19 +86,41 @@ end
 ---------------------------------------------------------------------------
 -- Per-fight provider (readable, out of combat only)
 ---------------------------------------------------------------------------
-local function FightValue(w, sessionId, newest)
+-- Returns value, found (found = false: the spell wasn't used in that fight).
+local function FightValue(w, sessionId, newest, metric)
     local d = w.data
+    metric = metric or d.metric
     if d.spellID then
         local s = ns.API.SessionSpell(sessionId, d.spellID, newest)
         if not s then return nil end
-        if d.metric == "share" then
-            return (s.sourceTotal > 0) and (s.total / s.sourceTotal * 100) or 0
+        if metric == "share" then
+            return (s.sourceTotal > 0) and (s.total / s.sourceTotal * 100) or 0, s.found
         end
-        return (d.metric == "dps") and s.dps or s.total
+        return (metric == "dps") and s.dps or s.total, s.found
     end
     local p = ns.API.SessionPlayer(sessionId, newest)
     if not p then return nil end
-    return (d.metric == "dps") and p.dps or p.total
+    return (metric == "dps") and p.dps or p.total, true
+end
+
+-- Counter showing the last completed fight (readable).
+local function RefreshFightCounter(w, f, list)
+    local last = list[#list]
+    if not last then
+        f.renderer:SetReadable(nil, w.data.metric, nil, w.counter.secondary, "no completed fights yet")
+        return true, "no fights"
+    end
+    local v, found = FightValue(w, last.id, true)
+    if v == nil then return false, ("fight %s not readable yet"):format(tostring(last.id)) end
+    local sec, sv = w.counter.secondary, nil
+    if sec == "time" then
+        sv = last.duration
+    elseif sec ~= "none" then
+        sv = FightValue(w, last.id, true, sec)
+    end
+    local note = (w.data.spellID and not found) and "not used in the last fight" or nil
+    f.renderer:SetReadable(note and nil or v, w.data.metric, sv, sec, note)
+    return true, "last fight #" .. tostring(last.id)
 end
 
 -- Rebuilds a per-fight widget from the last N completed fights.
@@ -109,6 +131,7 @@ local function RefreshFights(id)
     if InCombatLockdown() then return false, "in combat (updates after the fight)" end
     local list = ns.API.SessionList()
     if not list then return false, "fight list not available" end
+    if w.type == "counter" then return RefreshFightCounter(w, f, list) end
     local n = math.min(w.graph.samples, #list, WS().MAX_FIGHTS)
     local values = {}
     for i = #list - n + 1, #list do
@@ -170,13 +193,15 @@ end
 local function CreateFrameFor(id)
     local f = CreateFrame("Frame", nil, UIParent)
     f.id = id
+    local isCounter = Rec(id).type == "counter"
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:SetResizable(true)
+    local minW, minH = isCounter and 40 or 120, isCounter and 20 or 60
     if f.SetResizeBounds then
-        f:SetResizeBounds(120, 60, 900, 500)
+        f:SetResizeBounds(minW, minH, 900, 500)
     elseif f.SetMinResize then
-        f:SetMinResize(120, 60)
+        f:SetMinResize(minW, minH)
         f:SetMaxResize(900, 500)
     end
     f:SetFrameStrata("MEDIUM")
@@ -199,7 +224,8 @@ local function CreateFrameFor(id)
     f.value = f:CreateFontString(nil, "OVERLAY")
     f.value:SetJustifyH("RIGHT")
 
-    f.renderer = ns.GraphRenderer.New(f)
+    -- renderer interface: ApplyStyle(w), Reset(), Layout() + type-specific setters
+    f.renderer = isCounter and ns.CounterRenderer.New(f) or ns.GraphRenderer.New(f)
 
     f.overlay = MakeEdges(f, "OVERLAY")
     StyleEdges(f.overlay, 1, { 0.31, 0.76, 0.97, 0.7 }, false)
@@ -246,24 +272,31 @@ function WM.Apply(id)
     f.bg:SetShown(get("bg.enabled"))
     StyleEdges(f.border, get("border.size"), get("border.color"), get("border.enabled"))
 
-    local pad = get("padding")
-    ApplyFont(f.title, get("title.font"), get("title.size"), get("title.color"))
-    ApplyFont(f.value, get("value.font"), get("value.size"), get("value.color"))
-    f.title:ClearAllPoints()
-    f.title:SetPoint("TOPLEFT", pad, -pad)
-    f.title:SetPoint("RIGHT", f.value, "LEFT", -6, 0)
-    f.value:ClearAllPoints()
-    f.value:SetPoint("TOPRIGHT", -pad, -pad)
-    f.title:SetShown(get("title.enabled"))
-    f.value:SetShown(get("value.enabled"))
-    WM.UpdateTitle(id)
-
     f.overlayLabel:SetText(("%s [%s] - drag to move, corner to resize"):format(w.name, w.id))
-    f.renderer:ApplyStyle(w)
-    if w.data.kind == "fights" then
-        RefreshFights(id)
+    if w.type == "counter" then
+        -- the counter renderer owns its own title/value text
+        f.title:Hide()
+        f.value:Hide()
+        f.renderer:ApplyStyle(w)
+        if w.data.kind == "fights" then RefreshFights(id) else WM.UpdateLiveCounter(id) end
     else
-        f.renderer:SetScale(EffectiveRange(w))
+        local pad = get("padding")
+        ApplyFont(f.title, get("title.font"), get("title.size"), get("title.color"))
+        ApplyFont(f.value, get("value.font"), get("value.size"), get("value.color"))
+        f.title:ClearAllPoints()
+        f.title:SetPoint("TOPLEFT", pad, -pad)
+        f.title:SetPoint("RIGHT", f.value, "LEFT", -6, 0)
+        f.value:ClearAllPoints()
+        f.value:SetPoint("TOPRIGHT", -pad, -pad)
+        f.title:SetShown(get("title.enabled"))
+        f.value:SetShown(get("value.enabled"))
+        WM.UpdateTitle(id)
+        f.renderer:ApplyStyle(w)
+        if w.data.kind == "fights" then
+            RefreshFights(id)
+        else
+            f.renderer:SetScale(EffectiveRange(w))
+        end
     end
     ApplyMouse(f, w)
     f:SetShown(ShouldShow(w))
@@ -274,7 +307,7 @@ end
 
 function WM.UpdateTitle(id)
     local w, f = Rec(id), frames[id]
-    if not (w and f) then return end
+    if not (w and f) or w.type ~= "graph" then return end
     local demo = ns.Demo.IsActive() and w.data.kind == "live"
     f.title:SetText(w.name .. (demo and "  |cffff9900DEMO|r" or ""))
 end
@@ -294,6 +327,28 @@ end
 ---------------------------------------------------------------------------
 -- Sampling (one shared ticker)
 ---------------------------------------------------------------------------
+-- Live counter: primary + secondary straight from one snapshot (opaque-safe).
+local function PushCounter(f, w, snap)
+    local v = (w.data.metric == "damage") and snap.total or snap.dps
+    local sec, sv = w.counter.secondary, nil
+    if sec == "dps" then sv = snap.dps
+    elseif sec == "damage" then sv = snap.total
+    elseif sec == "time" then sv = snap.duration end
+    f.renderer:SetLive(v, w.data.metric, sv, sec)
+end
+
+-- Out-of-combat / settings-change refresh of a live counter.
+function WM.UpdateLiveCounter(id)
+    local w, f = Rec(id), frames[id]
+    if not (w and f) or w.type ~= "counter" or w.data.kind ~= "live" then return end
+    local snap = ns.Demo.IsActive() and ns.Demo.Snapshot() or ns.API.Snapshot(w.data.session)
+    PushCounter(f, w, snap)
+end
+
+local function UpdateAllLiveCounters()
+    for _, id in ipairs(DB().order) do WM.UpdateLiveCounter(id) end
+end
+
 local function Tick()
     local demo = ns.Demo.IsRunning()
     if not inCombat and not demo then return end
@@ -301,8 +356,9 @@ local function Tick()
     for _, id in ipairs(DB().order) do
         local w, f = Rec(id), frames[id]
         if w and f and f:IsShown() and w.data.kind == "live" then
+            local interval = (w.type == "counter") and w.counter.interval or w.graph.interval
             f.acc = (f.acc or 0) + TICK
-            if f.acc >= w.graph.interval - 0.01 then
+            if f.acc >= interval - 0.01 then
                 f.acc = 0
                 local key = demo and "demo" or w.data.session
                 local snap = snaps[key]
@@ -310,10 +366,14 @@ local function Tick()
                     snap = demo and ns.Demo.Snapshot() or ns.API.Snapshot(w.data.session)
                     snaps[key] = snap
                 end
-                local v = (w.data.metric == "damage") and snap.total or snap.dps
-                if type(v) == "number" then
-                    f.renderer:Push(v)
-                    SetValueText(f, w, v)
+                if w.type == "counter" then
+                    PushCounter(f, w, snap)
+                else
+                    local v = (w.data.metric == "damage") and snap.total or snap.dps
+                    if type(v) == "number" then
+                        f.renderer:Push(v)
+                        SetValueText(f, w, v)
+                    end
                 end
             end
         end
@@ -325,7 +385,7 @@ local function ResetWidgets(filter)
         local w, f = Rec(id), frames[id]
         if w and f and (not filter or filter(w)) then
             f.renderer:Reset()
-            f.renderer:SetScale(EffectiveRange(w))
+            if w.type == "graph" then f.renderer:SetScale(EffectiveRange(w)) end
             f.value:SetText("-")
             f.acc = 0
         end
@@ -336,7 +396,7 @@ end
 local function UpdateAutoScale()
     for _, id in ipairs(DB().order) do
         local w, f = Rec(id), frames[id]
-        if w and f and w.data.kind == "live" then
+        if w and f and w.data.kind == "live" and w.type == "graph" then
             local snap = ns.API.Snapshot(w.data.session)
             local v = (w.data.metric == "damage") and snap.total or snap.dps
             v = ns.SecretSafety.Readable(v)
@@ -355,6 +415,7 @@ end
 function WM.OnDemoChanged()
     ResetWidgets(function(w) return w.data.kind == "live" end) -- per-fight widgets show real fights only
     for _, id in ipairs(DB().order) do WM.UpdateTitle(id) end
+    if not ns.Demo.IsActive() then UpdateAllLiveCounters() end
 end
 
 ---------------------------------------------------------------------------
@@ -474,7 +535,7 @@ local function Resolve(token)
 end
 
 local HELP = {
-    "/sm widget new [live|fights] [dps|damage] [current|overall] [area|bars|line|points]",
+    "/sm widget new [graph|counter] [live|fights] [dps|damage] [current|overall] [area|bars|line|points]",
     "/sm widget list | edit (unlock/lock all)",
     "/sm widget <id> dup | delete | reset | lock | unlock | clickthrough",
     "/sm widget <id> name <text> | style <area|bars|line|points>",
@@ -502,8 +563,8 @@ function WM.Command(rest)
         for _, id in ipairs(DB().order) do
             local w = Rec(id)
             DEFAULT_CHAT_FRAME:AddMessage(("  %s  %s - %s, %s, %s%s"):format(id, w.name, MetricLabel(w),
-                WS().STYLES[w.graph.style], WS().VISIBILITY[w.behavior.visibility],
-                w.behavior.locked and ", locked" or ""))
+                w.type == "graph" and WS().STYLES[w.graph.style] or "Counter",
+                WS().VISIBILITY[w.behavior.visibility], w.behavior.locked and ", locked" or ""))
         end
         return
     end
@@ -519,6 +580,7 @@ function WM.Command(rest)
             local a = args[i]:lower()
             if WS().METRICS[a] or WS().FIGHT_METRICS[a] then opts.metric = a
             elseif a == "fights" or a == "live" then opts.kind = a
+            elseif a == "counter" or a == "graph" then opts.type = a
             elseif a == "current" or a == "overall" then opts.session = a
             elseif WS().STYLES[a] then opts.style = a end
         end
@@ -563,17 +625,19 @@ function WM.Command(rest)
         if name == "" or #name > 32 then ns.Print("Name must be 1-32 characters.") return end
         w.name = name
         WM.Apply(id)
+    elseif (cmd == "style" or cmd == "window" or cmd == "scale") and w.type ~= "graph" then
+        ns.Print("'" .. cmd .. "' only applies to graph widgets. Use the widget's settings window.")
     elseif cmd == "style" and val and WS().STYLES[val] then
         w.graph.style = val
         WM.Apply(id)
     elseif cmd == "metric" and val and WS().METRICS[val] then
         w.data.metric = val
-        w.graph.autoMax = nil
+        if w.graph then w.graph.autoMax = nil end
         ResetWidgets(function(x) return x.id == id end)
         WM.Apply(id)
     elseif cmd == "session" and (val == "current" or val == "overall") then
         w.data.session = val
-        w.graph.autoMax = nil
+        if w.graph then w.graph.autoMax = nil end
         ResetWidgets(function(x) return x.id == id end)
         WM.Apply(id)
     elseif cmd == "show" and val and WS().VISIBILITY[val] then
@@ -603,14 +667,14 @@ function WM.Command(rest)
         WM.Apply(id)
     elseif cmd == "paths" then
         ns.Print(id .. " appearance settings (override / effective):")
-        for _, e in ipairs(WS().APPEARANCE_SCHEMA) do
+        for _, e in ipairs(WS().SchemaFor(w.type).list) do
             local o = w.appearance[e[1]]
             DEFAULT_CHAT_FRAME:AddMessage(("  %s = %s%s"):format(e[1],
                 ns.Theme.FormatValue(e, WS().Get(w, e[1])), o ~= nil and "  (custom)" or ""))
         end
     elseif cmd == "set" and args[3] and args[4] then
         local path = args[3]
-        local e = WS().APPEARANCE_BY_PATH[path]
+        local e = WS().SchemaFor(w.type).byPath[path]
         if not e then ns.Print("Unknown setting. /sm widget " .. id .. " paths") return end
         -- reuse Theme parsing for the value types
         local v
@@ -625,10 +689,12 @@ function WM.Command(rest)
                 v = { tonumber(s:sub(1, 2), 16) / 255, tonumber(s:sub(3, 4), 16) / 255,
                       tonumber(s:sub(5, 6), 16) / 255, #s == 8 and tonumber(s:sub(7, 8), 16) / 255 or 1 }
             end
+        elseif e[2] == "text" then
+            v = text
         else
             v = text:lower()
         end
-        if v == nil or not WS().IsValidAppearance(path, v) then ns.Print("Invalid value for " .. path) return end
+        if v == nil or not WS().IsValidAppearance(path, v, w.type) then ns.Print("Invalid value for " .. path) return end
         w.appearance[path] = v
         WM.Apply(id)
     elseif cmd == "clear" and args[3] then
@@ -636,6 +702,7 @@ function WM.Command(rest)
         WM.Apply(id)
     elseif cmd == "copyto" and Resolve(args[3]) then
         local t = Rec(Resolve(args[3]))
+        if t.type ~= w.type then ns.Print("Appearance can only be copied between widgets of the same type.") return end
         t.appearance = ns.Theme.DeepCopy(w.appearance)
         WM.Apply(t.id)
         ns.Print("Copied appearance of " .. id .. " to " .. t.id)
@@ -643,9 +710,9 @@ function WM.Command(rest)
         local ok, info = RefreshFights(id)
         ns.Print(("%s refresh: %s (%s)"):format(id, ok and "updated" or "not updated", tostring(info)))
     elseif cmd == "makedefault" then
-        DB().defaults.appearance = ns.Theme.DeepCopy(w.appearance)
+        DB().defaults[WS().SchemaFor(w.type).dbKey] = ns.Theme.DeepCopy(w.appearance)
         ApplyAll()
-        ns.Print("Appearance of " .. id .. " is now the default for widgets without their own overrides.")
+        ns.Print("Appearance of " .. id .. " is now the default for " .. w.type .. " widgets without their own overrides.")
     else
         ns.Print("Unknown widget command. /sm widget help")
     end
@@ -667,6 +734,7 @@ function WM.Init()
         else
             inCombat = false
             C_Timer.After(0.3, UpdateAutoScale)
+            C_Timer.After(0.3, UpdateAllLiveCounters)
             -- the finished fight may join the session list a little later: retry
             C_Timer.After(0.6, RefreshAllFights)
             C_Timer.After(2.5, RefreshAllFights)
