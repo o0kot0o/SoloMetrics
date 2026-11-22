@@ -258,8 +258,15 @@ function M.Render(updateBars)
         if type(sp) == "table" then
             row:SetStatusBarColor(r, g, b, 0.75)
             if hasMax and (updateBars or isNew) then
-                SetBarRange(row, maxV)
-                SetBarValue(row, sp.totalAmount)
+                -- barOrder is an experiment: does a range change apply while
+                -- a value interpolation is in flight? (see API_VALIDATION)
+                if cfg.barOrder == "value" then
+                    SetBarValue(row, sp.totalAmount)
+                    SetBarRange(row, maxV)
+                else
+                    SetBarRange(row, maxV)
+                    SetBarValue(row, sp.totalAmount)
+                end
             end
             if getTex then row.icon:SetTexture(getTex(sp.spellID)) end
             if getName then row.name:SetText(getName(sp.spellID)) end

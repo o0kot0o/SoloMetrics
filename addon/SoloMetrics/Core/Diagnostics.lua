@@ -710,17 +710,18 @@ end
 function D.BarDebug()
     local r = NewReport("bar debug")
     local out = r.out
-    if InCombat() then
+    local demo = ns.Demo.IsActive()
+    if InCombat() and not demo then
         out("Run this out of combat (values are secret in combat).")
         r.finish(true)
         return
     end
     local cfg = ns.db.meter
-    out(("barScale=%s smoothBars=%s session=%s smoothingAvailable=%s"):format(
-        tostring(cfg.barScale), tostring(cfg.smoothBars), tostring(cfg.session),
-        tostring(ns.SpellMeter.SmoothingAvailable())))
+    out(("barScale=%s barOrder=%s smoothBars=%s session=%s smoothingAvailable=%s demo=%s"):format(
+        tostring(cfg.barScale), tostring(cfg.barOrder), tostring(cfg.smoothBars), tostring(cfg.session),
+        tostring(ns.SpellMeter.SmoothingAvailable()), tostring(demo)))
     out(("GetTime=%.1f"):format(GetTime()))
-    local snap = ns.API.Snapshot(cfg.session)
+    local snap = demo and ns.Demo.Snapshot() or ns.API.Snapshot(cfg.session)
     local R = function(v) if IsSecret(v) then return "<secret>" end return tostring(v) end
     out(("snapshot: duration=%s total=%s max=%s dps=%s spellCount=%s"):format(
         R(snap.duration), R(snap.total), R(snap.max), R(snap.dps), R(snap.spellCount)))
