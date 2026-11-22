@@ -2,6 +2,7 @@
 
 ## UPDATE 2026-11-22: v0.4.1 — branding + custom texture pack integrated (user-verified)
 
+User confirmed: custom color picker works (live + Cancel); Advanced sections work. Profile acceptance tests (round trip, malformed import, persistence) deliberately deferred by the user.
 User confirmed: new icon shows correctly (also inside EllesmereUI's minimap button bar); all custom textures load. Fine detail is hard to see on small bars (expected at low row heights).
 
 - Icon: `Assets/Icons/SoloMetrics_Minimap_64.tga` on the minimap button (drawn full-size, no tracking-border ring since the art has its own ring; additive highlight); `SoloMetrics_AddonIcon.tga` as TOC `IconTexture` (addon list / compartment).
