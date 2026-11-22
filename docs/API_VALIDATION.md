@@ -117,6 +117,12 @@ All OBSERVED 2026-11-22 (`/sm rendertest`, 11 in-combat ticks, 0 errors each). "
 
 Source `amountPerSecond` is recomputed at query time: polling during combat shows header DPS ticking down while the player stops attacking. Text polling at 10 Hz therefore gives a continuously live DPS readout (bars unaffected: all spells share the denominator).
 
+## Live graph feasibility (W1, 2026-11-22)
+
+- No time-series / interval API exists (8 functions, all aggregate). INFERRED from OBSERVED API surface.
+- `amountPerSecond` = running average, so a live series is "average DPS so far", not per-interval DPS.
+- Pending test `/sm graphtest`: vertical `StatusBar:SetValue(secret)` columns; dot textures anchored to `GetStatusBarTexture()` TOP; `Line:SetStartPoint/SetEndPoint` anchored to neighbouring fill tops. Records ok/err per call in combat and the first `DAMAGE_METER_COMBAT_SESSION_UPDATED` payloads. Result: **UNTESTED**.
+
 ## Data semantics (OBSERVED post-combat, Hunter, no pet, 4s fight)
 
 - `combatSpells` arrive **sorted by totalAmount descending** → live rows need no Lua sort.

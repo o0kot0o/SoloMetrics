@@ -705,6 +705,199 @@ function D.ToggleRenderTest()
 end
 
 ---------------------------------------------------------------------------
+-- /sm graphtest [scaleMax]: W1 live-graph feasibility
+-- A row of vertical StatusBars, one per 1 s sample. Each new sample is passed
+-- straight into the newest bar's SetValue (secret in combat - same opaque
+-- passthrough as the meter's bars, D-005). A dot is anchored to the TOP of
+-- each bar's fill texture and Line regions connect neighbouring dots, so the
+-- engine positions the curve; Lua never reads, compares or stores a value.
+-- Only column order (readable indices) is managed in Lua.
+-- Metric: player amountPerSecond = running AVERAGE DPS (total / elapsed),
+-- not per-interval DPS (that would need arithmetic on secret values).
+---------------------------------------------------------------------------
+local GT = { active = false, cols = {}, lines = {}, head = 0, count = 0, max = 50,
+             results = {}, order = {}, payloads = {}, events = 0 }
+local GT_N, GT_W, GT_H = 30, 300, 110
+local gtFrame, gtTicker
+local gtEvents = CreateFrame("Frame")
+
+local function GTRecord(name, ok, err)
+    if not InCombat() then return end
+    local r = GT.results[name]
+    if not r then
+        r = { ok = 0, err = 0 }
+        GT.results[name] = r
+        GT.order[#GT.order + 1] = name
+    end
+    if ok then r.ok = r.ok + 1 else r.err = r.err + 1; r.lastErr = tostring(err):sub(1, 160) end
+end
+
+local function GTBuild()
+    local f = CreateFrame("Frame", "SoloMetricsGraphTest", UIParent)
+    f:SetSize(GT_W + 20, GT_H + 50)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, -230)
+    f:SetClampedToScreen(true)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.07, 0.07, 0.08, 0.85)
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    title:SetPoint("TOPLEFT", 10, -7)
+    title:SetText("SoloMetrics GRAPH TEST (diagnostic)")
+    f.sub = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.sub:SetPoint("TOPLEFT", 10, -22)
+
+    local plot = CreateFrame("Frame", nil, f)
+    plot:SetSize(GT_W, GT_H)
+    plot:SetPoint("BOTTOMLEFT", 10, 8)
+    local pbg = plot:CreateTexture(nil, "BACKGROUND")
+    pbg:SetAllPoints()
+    pbg:SetColorTexture(1, 1, 1, 0.04)
+    f.plot = plot
+
+    local colW = GT_W / GT_N
+    for i = 1, GT_N do
+        local b = CreateFrame("StatusBar", nil, plot)
+        b:SetOrientation("VERTICAL")
+        b:SetSize(colW - 1, GT_H)
+        b:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+        b:SetStatusBarColor(0.25, 0.78, 0.72, 0.35)
+        b:SetMinMaxValues(0, 1)
+        b:SetValue(0)
+        b.dot = b:CreateTexture(nil, "OVERLAY")
+        b.dot:SetSize(4, 4)
+        b.dot:SetColorTexture(1, 1, 1, 1)
+        b.dot:SetPoint("CENTER", b:GetStatusBarTexture(), "TOP", 0, 0)
+        b:Hide()
+        GT.cols[i] = b
+    end
+    for i = 1, GT_N - 1 do
+        local l = plot:CreateLine(nil, "OVERLAY")
+        l:SetThickness(2)
+        l:SetColorTexture(1, 1, 1, 0.9)
+        l:Hide()
+        GT.lines[i] = l
+    end
+    f:Hide()
+    gtFrame = f
+end
+
+local function GTStatus()
+    gtFrame.sub:SetText(("Average DPS so far, 1 sample/s, scale 0-%s | samples: %d%s"):format(
+        tostring(GT.max), GT.count, InCombat() and "  (in combat)" or ""))
+end
+
+local function GTLayout()
+    local n = math.min(GT.count, GT_N)
+    local colW = GT_W / GT_N
+    local slots = {}
+    for s = 1, n do
+        local idx = ((GT.head - n + s - 1) % GT_N) + 1 -- oldest .. newest
+        local b = GT.cols[idx]
+        b:ClearAllPoints()
+        b:SetPoint("BOTTOMLEFT", gtFrame.plot, "BOTTOMLEFT", (GT_N - n + s - 1) * colW, 0)
+        b:Show()
+        slots[s] = b
+    end
+    for i = 1, GT_N - 1 do
+        local l = GT.lines[i]
+        if i < n then
+            local okA, errA = pcall(l.SetStartPoint, l, "TOP", slots[i]:GetStatusBarTexture(), 0, 0)
+            local okB, errB = pcall(l.SetEndPoint, l, "TOP", slots[i + 1]:GetStatusBarTexture(), 0, 0)
+            GTRecord("Line:SetStartPoint/SetEndPoint(fill TOP)", okA and okB, errA or errB)
+            l:Show()
+        else
+            l:Hide()
+        end
+    end
+    GTStatus()
+end
+
+local function GTReset()
+    for _, b in ipairs(GT.cols) do
+        b:SetMinMaxValues(0, 1)
+        b:SetValue(0)
+        b:Hide()
+    end
+    for _, l in ipairs(GT.lines) do l:Hide() end
+    GT.head, GT.count = 0, 0
+    GT.results, GT.order, GT.payloads, GT.events = {}, {}, {}, 0
+    GTStatus()
+end
+
+local function GTSample()
+    if not InCombat() then return end -- the question is in-combat sampling
+    local snap = ns.API.Snapshot("current")
+    if type(snap.dps) ~= "number" then return end -- no value: no sample (never fabricate)
+    GT.head = GT.head % GT_N + 1
+    local b = GT.cols[GT.head]
+    local ok1, e1 = pcall(b.SetMinMaxValues, b, 0, GT.max)
+    local ok2, e2 = pcall(b.SetValue, b, snap.dps)
+    GTRecord("StatusBar(VERTICAL):SetValue(secret dps)", ok1 and ok2, e1 or e2)
+    GT.count = GT.count + 1
+    GTLayout()
+end
+
+local function GTReport()
+    local r = NewReport("graph test: live opaque graph feasibility")
+    r.out(("Samples taken in combat: %d (1/s), scale 0-%s"):format(GT.count, tostring(GT.max)))
+    r.out("In-combat native calls (ok / err counts):")
+    if #GT.order == 0 then r.out("  (no in-combat attempts recorded)") end
+    for _, name in ipairs(GT.order) do
+        local x = GT.results[name]
+        r.out(("  %s: ok=%d err=%d%s"):format(name, x.ok, x.err, x.lastErr and ("  last error: " .. x.lastErr) or ""))
+    end
+    r.out(("DAMAGE_METER_COMBAT_SESSION_UPDATED during fight: %d; first readable payloads:"):format(GT.events))
+    for _, p in ipairs(GT.payloads) do r.out("  " .. p) end
+    r.out("VISUAL CHECK: did the dots and line follow the bars live during combat?")
+    r.finish(true)
+end
+
+gtEvents:SetScript("OnEvent", function(_, event, a, b)
+    if event == "PLAYER_REGEN_DISABLED" then
+        GTReset()
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        C_Timer.After(0.3, function()
+            GTStatus()
+            GTReport()
+        end)
+    elseif event == "DAMAGE_METER_COMBAT_SESSION_UPDATED" then
+        GT.events = GT.events + 1
+        if #GT.payloads < 5 then
+            local da = IsSecret(a) and "<secret>" or (type(a) .. ":" .. tostring(a))
+            local db = IsSecret(b) and "<secret>" or (type(b) .. ":" .. tostring(b))
+            GT.payloads[#GT.payloads + 1] = da .. ", " .. db
+        end
+    end
+end)
+
+function D.ToggleGraphTest(args)
+    if not gtFrame then GTBuild() end
+    local n = tonumber(args or "")
+    if n and n > 0 then GT.max = n end
+    GT.active = not GT.active
+    if GT.active then
+        GTReset()
+        gtFrame:Show()
+        gtEvents:RegisterEvent("PLAYER_REGEN_DISABLED")
+        gtEvents:RegisterEvent("PLAYER_REGEN_ENABLED")
+        pcall(gtEvents.RegisterEvent, gtEvents, "DAMAGE_METER_COMBAT_SESSION_UPDATED")
+        gtTicker = C_Timer.NewTicker(1, GTSample)
+        ns.Print(("Graph test ON (scale 0-%s DPS; /sm graphtest <number> to change). Fight something and watch the panel."):format(tostring(GT.max)))
+    else
+        if gtTicker then gtTicker:Cancel() end
+        gtTicker = nil
+        gtEvents:UnregisterAllEvents()
+        gtFrame:Hide()
+        ns.Print("Graph test OFF.")
+    end
+end
+
+---------------------------------------------------------------------------
 -- /sm bardebug: what the meter's bars actually hold vs. the data (out of combat)
 ---------------------------------------------------------------------------
 function D.BarDebug()

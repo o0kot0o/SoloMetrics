@@ -26,5 +26,8 @@ Per `CONFIG_UI_DESIGN.md` (ChatGPT, approved): left nav + right pane + search; i
 ## D-007 — Custom themed color picker instead of native ColorPickerFrame (2026-11-22)
 Supersedes the "native picker" part of D-006 / CONFIG_UI_DESIGN decision 3, at the user's request: the Blizzard picker looked out of place against the flat theme (screenshot). Replacement (`Settings/Widgets.lua`): HSV square, hue strip, opacity strip over a checkerboard, New/Original swatches (click Original to restore), `#RRGGBBAA` hex input with validation, OK/Cancel. Live preview while dragging. Any close other than OK (Cancel, Escape, closing the settings window) restores the exact original RGBA — keeps acceptance test 5 semantics.
 
+## D-008 — Widget engine data paths (2026-11-22, W1)
+Per the widget-engine directive and `docs/WIDGETS_DESIGN.md`. Three explicitly labeled source kinds: **live** (opaque value pushed each interval into a native StatusBar column; never stored in Lua; limited to player average-DPS-so-far and cumulative damage; pending `/sm graphtest`), **fights** (one readable value per completed session, out of combat), **demo**. Per-interval DPS and per-spell live graphs are declared unsupported (need arithmetic/comparison on secrets). Spell widgets bind a readable spellID captured out of combat. Widget appearance stores overrides only, resolved over user defaults over built-in defaults. 12-widget cap.
+
 ## D-004 — Lua safety lint (2026-11-22)
 `Validate-SoloMetrics.ps1` fails on combat-log event usage, `loadstring`/`RunScript`, and any `ResetAllCombatSessions` reference lacking an `SM-ALLOW-RESET` review marker.

@@ -119,7 +119,7 @@ function commands.help()
     ns.Print("  /sm test [seconds] [big] - simulated DEMO fight (fake numbers); again to clear")
     ns.Print("  /sm resetui - re-center and unlock the meter (keeps data)")
     ns.Print("  /sm version")
-    ns.Print("  diagnostics: /sm debug, /sm probe, /sm watch, /sm rendertest, /sm copy")
+    ns.Print("  diagnostics: /sm debug, /sm probe, /sm watch, /sm rendertest, /sm graphtest, /sm copy")
 end
 
 function commands.version()
@@ -245,6 +245,7 @@ function commands.rendertest() ns.Diagnostics.ToggleRenderTest() end
 function commands.copy() ns.Diagnostics.ShowCopy() end
 function commands.test(rest) ns.Demo.Toggle(rest) end
 function commands.bardebug() ns.Diagnostics.BarDebug() end
+function commands.graphtest(rest) ns.Diagnostics.ToggleGraphTest(rest) end
 
 SLASH_SOLOMETRICS1 = "/sm"
 SLASH_SOLOMETRICS2 = "/solometrics"

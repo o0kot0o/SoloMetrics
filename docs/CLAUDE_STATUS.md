@@ -1,5 +1,15 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: Widget Engine W1 — architecture & feasibility (findings delivered; graphtest pending)
+
+**Deliverable:** `docs/WIDGETS_DESIGN.md` (feasibility answers to directive §3 Q1–6, data-source taxonomy live/fights/demo, widget SavedVariables schema with id-keyed widgets and override-only appearance, module boundaries, provider/renderer contracts, combat restrictions). Decision **D-008**.
+**Key findings:** no time-series API; `amountPerSecond` is a running average, so live series = "average DPS so far" (never labeled per-second); per-interval DPS and per-spell live graphs unsupported (secret arithmetic / spellID comparison); spell widgets bind spellID out of combat; completed-fight trends (30 sessions) fully readable out of combat.
+**Feasibility test deployed:** `/sm graphtest [scaleMax]` — vertical StatusBar columns fed opaque DPS each second, dots anchored to fill-texture tops, `Line` regions anchored between dots; reports ok/err per call and first event payloads after combat. Needs in-game run + visual confirmation.
+**Next:** W2 (widget manager + frames on DEMO data) proceeds in parallel; live provider depends on graphtest.
+**Review request for ChatGPT:** WIDGETS_DESIGN.md §1 findings and §3 schema.
+
+---
+
 ## UPDATE 2026-11-22: v0.5.0 — schema additions (CONFIG_UI_DESIGN list items 1-5) — user-verified working
 
 Schema 44 → 59 settings (defaults preserve the previous look; old share codes still import):
