@@ -39,15 +39,10 @@ local function SetBarValue(bar, v)
     bar:SetValue(v)
 end
 
--- Range changes (top spell grows every hit) must animate too, or every bar
--- snaps when the max changes.
-local rangeSmoothing = true
+-- Plain SetMinMaxValues: verified to accept secret max in combat (rendertest).
+-- An interpolation 3rd argument was tried and caused ranges not to apply in
+-- combat (bars then shrank at combat end) - do not reintroduce untested.
 local function SetBarRange(bar, maxV)
-    if smoothing and rangeSmoothing and Cfg().smoothBars then
-        local ok = pcall(bar.SetMinMaxValues, bar, 0, maxV, smoothing)
-        if ok then return end
-        rangeSmoothing = false
-    end
     bar:SetMinMaxValues(0, maxV)
 end
 
