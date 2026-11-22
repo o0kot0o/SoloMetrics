@@ -18,6 +18,12 @@ local function S(path, label, extra)
     return it
 end
 local function SEC(label) return { kind = "section", label = label } end
+-- Opacity slider for the alpha component of a color setting.
+local function ALPHA(path, label, extra)
+    local it = { kind = "alpha", path = path, label = label, step = 0.01 }
+    if extra then for k, v in pairs(extra) do it[k] = v end end
+    return it
+end
 
 R.CATEGORIES = {
     {
@@ -52,6 +58,10 @@ R.CATEGORIES = {
             S("backdrop.enabled", "Show background"),
             S("backdrop.color", "Background color", { dep = "backdrop.enabled",
               tip = "Opacity only affects the background, never bars or text." }),
+            ALPHA("backdrop.color", "Background opacity", { dep = "backdrop.enabled",
+              tip = "0% = invisible background; bars and text stay fully visible." }),
+            S("backdrop.texture", "Background texture", { dep = "backdrop.enabled",
+              tip = "Flat or any bundled texture, tinted by the background color." }),
             SEC("Border"),
             S("border.enabled", "Show border"),
             S("border.color", "Border color", { dep = "border.enabled" }),
@@ -73,14 +83,26 @@ R.CATEGORIES = {
             S("bar.classColor", "Use class color", { dep = "bar.enabled" }),
             S("bar.color", "Bar color", { dep = "bar.enabled",
               tip = "Used when class color is off. Its opacity always applies to the fill only." }),
+            ALPHA("bar.color", "Bar fill opacity", { dep = "bar.enabled",
+              tip = "Fades only the bar fill - text and icons are unaffected. Applies with class color too." }),
             SEC("Bar background"),
             S("barBg.enabled", "Show bar background", { tip = "The track behind each bar." }),
             S("barBg.color", "Bar background color", { dep = "barBg.enabled" }),
+            ALPHA("barBg.color", "Bar background opacity", { dep = "barBg.enabled" }),
+            S("barBg.texture", "Bar background texture", { dep = "barBg.enabled" }),
             SEC("Rows"),
             S("rows.height", "Row height", { step = 1 }),
             SEC("Spell icons"),
             S("icon.enabled", "Show spell icons"),
+            S("icon.matchRow", "Icon size matches row height", { dep = "icon.enabled" }),
+            S("icon.size", "Icon size", { dep = "icon.enabled", depOff = "icon.matchRow", step = 1,
+              tip = "Used when 'Icon size matches row height' is off." }),
+            S("icon.border", "Icon border", { dep = "icon.enabled" }),
+            S("icon.borderColor", "Icon border color", { dep = { "icon.enabled", "icon.border" } }),
             S("icon.alpha", "Icon opacity", { dep = "icon.enabled", step = 0.05, adv = true }),
+            S("icon.crop", "Icon edge crop", { dep = "icon.enabled", step = 0.01, adv = true,
+              tip = "Trims the icon's built-in border. 0 = full icon." }),
+            S("icon.gap", "Gap between icon and bar", { dep = "icon.enabled", step = 1, adv = true }),
         },
     },
     {
@@ -91,13 +113,19 @@ R.CATEGORIES = {
             S("text.size", "Font size", { step = 1 }),
             S("text.outline", "Outline"),
             S("text.shadow", "Drop shadow"),
+            S("text.shadowColor", "Shadow color", { dep = "text.shadow", adv = true }),
+            S("text.shadowOffset", "Shadow distance", { dep = "text.shadow", step = 1, adv = true }),
             SEC("Columns"),
             S("text.name.enabled", "Show spell name"),
-            S("text.name.color", "Spell name color", { dep = "text.name.enabled" }),
+            S("text.name.color", "Spell name color", { dep = "text.name.enabled",
+              tip = "Opacity here fades only this column." }),
+            S("text.name.align", "Spell name alignment", { dep = "text.name.enabled" }),
             S("text.amount.enabled", "Show damage"),
             S("text.amount.color", "Damage color", { dep = "text.amount.enabled" }),
+            S("text.amount.align", "Damage alignment", { dep = "text.amount.enabled" }),
             S("text.dps.enabled", "Show DPS"),
             S("text.dps.color", "DPS color", { dep = "text.dps.enabled" }),
+            S("text.dps.align", "DPS alignment", { dep = "text.dps.enabled" }),
             S("text.columnWidth", "Number column width", { step = 1, adv = true }),
         },
     },
@@ -116,6 +144,10 @@ R.CATEGORIES = {
             S("header.outline", "Header outline", { dep = "header.enabled" }),
             S("header.labelColor", "Label color", { dep = "header.enabled", tip = "DPS / DMG labels and session text." }),
             S("header.valueColor", "Value color", { dep = "header.enabled", tip = "DPS, damage and timer numbers." }),
+            SEC("Header background"),
+            S("header.bg.enabled", "Header background strip", { dep = "header.enabled",
+              tip = "A separate band behind the header, on top of the window background." }),
+            S("header.bg.color", "Header background color", { dep = { "header.enabled", "header.bg.enabled" } }),
             S("header.height", "Header height", { dep = "header.enabled", step = 1, adv = true }),
         },
     },
@@ -141,7 +173,9 @@ R.CATEGORIES = {
             S("border.enabled", "Border"),
             S("accent.enabled", "Accent line"),
             S("header.enabled", "Header"),
+            S("header.bg.enabled", "Header background strip"),
             S("icon.enabled", "Spell icons"),
+            S("icon.border", "Icon borders"),
             S("bar.enabled", "Bar fill"),
             S("barBg.enabled", "Bar background"),
             S("text.name.enabled", "Spell name"),

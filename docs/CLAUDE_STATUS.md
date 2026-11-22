@@ -1,5 +1,16 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: v0.5.0 — schema additions (CONFIG_UI_DESIGN list items 1-5) — awaiting in-game test
+
+Schema 44 → 59 settings (defaults preserve the previous look; old share codes still import):
+- `backdrop.texture`, `barBg.texture` (any registered texture, tinted via vertex color)
+- `header.bg.enabled` / `header.bg.color` (separate band behind the header)
+- `icon.matchRow`, `icon.size`, `icon.crop`, `icon.gap`, `icon.border`, `icon.borderColor`
+- `text.name|amount|dps.align` (new `align` type: left/center/right), `text.shadowColor`, `text.shadowOffset`
+Config: new `alpha` item kind = opacity slider (percent) editing the alpha component of an existing color setting (backdrop, bar fill, bar background) — no duplicated stored values; `dep` accepts a list; new `depOff` (enabled only when a toggle is off, e.g. icon size vs. "match row height"). Item 1 (independent fill/background alpha) was already true in the renderer — alpha lives in each element's own color; now also exposed as sliders. Item 6 (per-ability overrides) intentionally not done (needs safe in-combat spell identity; spellID is secret in combat).
+
+---
+
 ## UPDATE 2026-11-22: v0.4.1 — branding + custom texture pack integrated (user-verified)
 
 User confirmed: custom color picker works (live + Cancel); Advanced sections work. Profile acceptance tests (round trip, malformed import, persistence) deliberately deferred by the user.

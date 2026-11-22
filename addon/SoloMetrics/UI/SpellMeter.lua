@@ -82,17 +82,30 @@ end
 ---------------------------------------------------------------------------
 -- Style helpers
 ---------------------------------------------------------------------------
+-- shadow: false/nil = none, true = default, or { color = {r,g,b,a}, offset = n }
 local function ApplyFont(fs, fontKey, size, outline, shadow, color)
     local flags = ns.Theme.OUTLINES[outline] or ""
     fs:SetFont(ns.Theme.FontPath(fontKey), size, flags)
     if not fs:GetFont() then fs:SetFont(STANDARD_TEXT_FONT, size, flags) end
     if shadow then
-        fs:SetShadowOffset(1, -1)
-        fs:SetShadowColor(0, 0, 0, 0.9)
+        local sc = (type(shadow) == "table" and shadow.color) or { 0, 0, 0, 0.9 }
+        local off = (type(shadow) == "table" and shadow.offset) or 1
+        fs:SetShadowOffset(off, -off)
+        fs:SetShadowColor(sc[1], sc[2], sc[3], sc[4] or 1)
     else
         fs:SetShadowOffset(0, 0)
     end
     if color then fs:SetTextColor(color[1], color[2], color[3], color[4] or 1) end
+end
+
+local function SetTextureColor(tex, path, c)
+    tex:SetTexture(path)
+    tex:SetVertexColor(c[1], c[2], c[3], c[4] or 1)
+end
+
+local function IconWidth(st)
+    if not st.icon.enabled then return 0 end
+    return st.icon.matchRow and st.rows.height or st.icon.size
 end
 
 local function NewText(parent, justify)
@@ -148,28 +161,37 @@ end
 
 local function LayoutRow(r, i, st)
     local rh, sp, pad = st.rows.height, st.rows.spacing, st.padding
-    local iconW = st.icon.enabled and rh or 0
+    local ic = st.icon
+    local iconW = IconWidth(st)
     r:ClearAllPoints()
     r:SetHeight(rh)
-    r:SetPoint("TOPLEFT", frame, "TOPLEFT", pad + (iconW > 0 and iconW + 2 or 0), -(RowsTop(st) + (i - 1) * (rh + sp)))
+    r:SetPoint("TOPLEFT", frame, "TOPLEFT", pad + (iconW > 0 and iconW + ic.gap or 0), -(RowsTop(st) + (i - 1) * (rh + sp)))
     r:SetPoint("RIGHT", frame, "RIGHT", -pad, 0)
 
     r:SetStatusBarTexture(ns.Theme.TexturePath(st.bar.texture))
     r.bg:SetShown(st.barBg.enabled)
-    local c = st.barBg.color
-    r.bg:SetColorTexture(c[1], c[2], c[3], c[4])
+    SetTextureColor(r.bg, ns.Theme.TexturePath(st.barBg.texture), st.barBg.color)
 
-    r.icon:SetSize(rh, rh)
-    r.icon:SetShown(st.icon.enabled)
-    r.icon:SetAlpha(st.icon.alpha)
+    r.icon:ClearAllPoints()
+    r.icon:SetPoint("RIGHT", r, "LEFT", -ic.gap, 0)
+    r.icon:SetSize(iconW > 0 and iconW or 1, iconW > 0 and iconW or 1)
+    r.icon:SetShown(ic.enabled)
+    r.icon:SetAlpha(ic.alpha)
+    r.icon:SetTexCoord(ic.crop, 1 - ic.crop, ic.crop, 1 - ic.crop)
+    local bc = ic.borderColor
+    LayoutEdges(r.iconBorder, r.icon, 1, bc[1], bc[2], bc[3], bc[4], ic.enabled and ic.border)
 
     local tx = st.text
-    ApplyFont(r.name, tx.font, tx.size, tx.outline, tx.shadow, tx.name.color)
-    ApplyFont(r.amount, tx.font, tx.size, tx.outline, tx.shadow, tx.amount.color)
-    ApplyFont(r.dps, tx.font, tx.size, tx.outline, tx.shadow, tx.dps.color)
+    local shadow = tx.shadow and { color = tx.shadowColor, offset = tx.shadowOffset } or false
+    ApplyFont(r.name, tx.font, tx.size, tx.outline, shadow, tx.name.color)
+    ApplyFont(r.amount, tx.font, tx.size, tx.outline, shadow, tx.amount.color)
+    ApplyFont(r.dps, tx.font, tx.size, tx.outline, shadow, tx.dps.color)
     r.name:SetShown(tx.name.enabled)
     r.amount:SetShown(tx.amount.enabled)
     r.dps:SetShown(tx.dps.enabled)
+    r.name:SetJustifyH(ns.Theme.ALIGNS[tx.name.align] or "LEFT")
+    r.amount:SetJustifyH(ns.Theme.ALIGNS[tx.amount.align] or "RIGHT")
+    r.dps:SetJustifyH(ns.Theme.ALIGNS[tx.dps.align] or "RIGHT")
 
     r.dps:ClearAllPoints()
     r.amount:ClearAllPoints()
@@ -196,8 +218,7 @@ local function CreateRow(i)
     r.bg = r:CreateTexture(nil, "BACKGROUND")
     r.bg:SetAllPoints()
     r.icon = r:CreateTexture(nil, "ARTWORK")
-    r.icon:SetPoint("RIGHT", r, "LEFT", -2, 0)
-    r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    r.iconBorder = MakeEdges(r, "OVERLAY")
     r.name = NewText(r, "LEFT")
     r.amount = NewText(r, "RIGHT")
     r.dps = NewText(r, "RIGHT")
@@ -277,8 +298,16 @@ function M.ApplyStyle()
     frame:SetWidth(st.width)
 
     local c = st.backdrop.color
-    frame.bg:SetColorTexture(c[1], c[2], c[3], c[4])
+    SetTextureColor(frame.bg, ns.Theme.TexturePath(st.backdrop.texture), c)
     frame.bg:SetShown(st.backdrop.enabled)
+
+    local hb = st.header.bg
+    header.bgTex:ClearAllPoints()
+    header.bgTex:SetPoint("TOPLEFT")
+    header.bgTex:SetPoint("TOPRIGHT")
+    header.bgTex:SetHeight(math.max(HeaderHeight(st), 1))
+    header.bgTex:SetColorTexture(hb.color[1], hb.color[2], hb.color[3], hb.color[4])
+    header.bgTex:SetShown(st.header.enabled and hb.enabled)
 
     c = st.border.color
     LayoutEdges(edges, frame, st.border.size, c[1], c[2], c[3], c[4], st.border.enabled)
@@ -372,6 +401,7 @@ local function CreateMeter()
     edges = MakeEdges(frame, "BORDER")
 
     header = {}
+    header.bgTex = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
     header.accent = frame:CreateTexture(nil, "ARTWORK")
     header.accent:SetPoint("TOPLEFT")
     header.accent:SetPoint("TOPRIGHT")

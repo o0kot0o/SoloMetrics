@@ -32,30 +32,62 @@ local demoStartedHere = false
 ---------------------------------------------------------------------------
 local function Active() return ns.Theme.Active() end
 
+-- Item kinds bound to a value: style (schema path), meter (db.meter key),
+-- alpha (the opacity component of a style color path, edited as a slider).
+local function IsBound(item)
+    return item.kind == "style" or item.kind == "meter" or item.kind == "alpha"
+end
+
 local function TypeOf(item)
     if item.kind == "style" then
         local e = ns.Theme.SCHEMA_BY_PATH[item.path]
         return e[2], e[3], e[4]
+    elseif item.kind == "alpha" then
+        return "number", 0, 1
     end
     return item.type, item.min, item.max
 end
 
 local function GetValue(item)
     if item.kind == "style" then return ns.Theme.GetPath(Active(), item.path) end
+    if item.kind == "alpha" then
+        local c = ns.Theme.GetPath(Active(), item.path)
+        return c and (c[4] or 1) or 1
+    end
     return ns.db.meter[item.key]
 end
 
 local function DefaultOf(item)
     if item.kind == "style" then return ns.Theme.GetDefault(item.path) end
+    if item.kind == "alpha" then
+        local c = ns.Theme.GetDefault(item.path)
+        return c and (c[4] or 1) or 1
+    end
     return ns.METER_DEFAULTS[item.key]
 end
 
+-- dep: bool path (or list) that must be ON; depOff: bool path that must be OFF.
 local function DepOK(item)
-    if not item.dep then return true end
-    return ns.Theme.GetPath(Active(), item.dep) == true
+    local st = Active()
+    local deps = item.dep
+    if type(deps) == "string" then deps = { deps } end
+    for _, d in ipairs(deps or {}) do
+        if ns.Theme.GetPath(st, d) ~= true then return false end
+    end
+    if item.depOff and ns.Theme.GetPath(st, item.depOff) == true then return false end
+    return true
 end
 
 local function ApplyValue(item, v)
+    if item.kind == "alpha" then
+        if type(v) ~= "number" then return false end
+        local c = ns.Theme.GetPath(Active(), item.path)
+        local nv = { c[1], c[2], c[3], math.max(0, math.min(1, v)) }
+        if not ns.Theme.IsValidValue(item.path, nv) then return false end
+        ns.Theme.SetPath(Active(), item.path, nv)
+        ns.SpellMeter.ApplyStyle()
+        return true
+    end
     if item.kind == "style" then
         if type(v) == "table" then v = { v[1], v[2], v[3], v[4] or 1 } end
         if not ns.Theme.IsValidValue(item.path, v) then return false end
@@ -88,8 +120,9 @@ local function RoundStep(v, step)
     return math.floor(v / step + 0.5) * step
 end
 
-local function FormatNumber(v, step)
+local function FormatNumber(v, step, percent)
     if type(v) ~= "number" then return "" end
+    if percent then return ("%d%%"):format(math.floor(v * 100 + 0.5)) end
     if (step or 1) < 1 then return ("%.2f"):format(v) end
     return tostring(math.floor(v + 0.5))
 end
@@ -107,6 +140,7 @@ local function ShowTip(row)
         GameTooltip:AddLine("Disabled: turn on its parent element first. Value is kept.", 1, 0.6, 0.3, true)
     end
     local key = item.path or (item.key and ("meter." .. item.key))
+    if key and item.kind == "alpha" then key = key .. " (opacity)" end
     if key then GameTooltip:AddLine(key, 0.45, 0.45, 0.5) end
     GameTooltip:Show()
 end
@@ -194,8 +228,9 @@ constructors.slider = function()
         if v ~= GetValue(row.item) then SetValue(row.item, v) end
     end)
     row.edit.onCommit = function(text)
-        local v = tonumber(text)
+        local v = tonumber((text:gsub("%%", "")))
         if not v then return end
+        if row.item.kind == "alpha" then v = v / 100 end -- typed as percent
         local _, mn, mx = TypeOf(row.item)
         v = math.max(mn, math.min(mx, RoundStep(v, row.item.step)))
         SetValue(row.item, v)
@@ -210,7 +245,9 @@ constructors.slider = function()
         self.slider:SetValueStep(self.item.step or 1)
         self.slider:SetValue(v)
         self.slider.updating = false
-        if not self.edit:HasFocus() then self.edit:SetText(FormatNumber(v, self.item.step)) end
+        if not self.edit:HasFocus() then
+            self.edit:SetText(FormatNumber(v, self.item.step, self.item.kind == "alpha"))
+        end
         self:SetEnabledState(DepOK(self.item))
     end
     return row
@@ -232,6 +269,11 @@ local function OptionsFor(item)
     elseif t == "outline" then
         for _, key in ipairs({ "none", "outline", "thick" }) do
             opts[#opts + 1] = { value = key, label = OUTLINE_LABELS[key] }
+        end
+        return opts
+    elseif t == "align" then
+        for _, kv in ipairs({ { "left", "Left" }, { "center", "Center" }, { "right", "Right" } }) do
+            opts[#opts + 1] = { value = kv[1], label = kv[2] }
         end
         return opts
     elseif t == "enum" then
@@ -635,7 +677,7 @@ function Render(resetScroll)
     end
     local function addItem(item)
         local k = item.kind
-        if k == "style" or k == "meter" then
+        if IsBound(item) then
             local row = Acquire(ControlKind(item))
             row.item = item
             row.label:SetText(item.label)
@@ -672,7 +714,7 @@ function Render(resetScroll)
         for _, cat in ipairs(ns.ConfigRegistry.CATEGORIES) do
             local header = false
             for _, item in ipairs(cat.items) do
-                if (item.kind == "style" or item.kind == "meter") then
+                if IsBound(item) then
                     local hay = ((item.label or "") .. " " .. (item.tip or "") .. " " .. (item.path or item.key or "")):lower()
                     if hay:find(query, 1, true) then
                         if not header then
@@ -749,7 +791,7 @@ local function ResetCategory()
     if query ~= "" then return end
     local cat = CategoryById(currentCat)
     for _, item in ipairs(cat.items) do
-        if item.kind == "style" or item.kind == "meter" then
+        if IsBound(item) then
             ApplyValue(item, DefaultOf(item))
         end
     end

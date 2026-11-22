@@ -34,6 +34,7 @@ for _, t in ipairs(ns.CUSTOM_TEXTURES or {}) do
 end
 
 T.OUTLINES = { none = "", outline = "OUTLINE", thick = "THICKOUTLINE" }
+T.ALIGNS = { left = "LEFT", center = "CENTER", right = "RIGHT" }
 
 function T.FontPath(key)
     local f = T.FONTS[key] or T.FONTS.default
@@ -53,7 +54,7 @@ local DEFAULT = {
     width = 280,
     scale = 1.0,
     padding = 4,
-    backdrop = { enabled = true, color = { 0.07, 0.07, 0.08, 0.78 } },
+    backdrop = { enabled = true, texture = "flat", color = { 0.07, 0.07, 0.08, 0.78 } },
     border = { enabled = false, color = { 0, 0, 0, 1 }, size = 1 },
     accent = { enabled = true, classColor = true, color = { 0.31, 0.76, 0.97, 0.9 }, height = 2 },
     header = {
@@ -61,16 +62,21 @@ local DEFAULT = {
         font = "default", size = 13, outline = "none",
         labelColor = { 0.6, 0.6, 0.6, 1 }, valueColor = { 1, 1, 1, 1 },
         showDps = true, showTotal = true, showTimer = true, showSession = true,
+        bg = { enabled = false, color = { 0, 0, 0, 0.35 } },
     },
     rows = { height = 18, spacing = 1 },
-    icon = { enabled = true, alpha = 1 },
+    icon = {
+        enabled = true, alpha = 1, matchRow = true, size = 18, crop = 0.08, gap = 2,
+        border = false, borderColor = { 0, 0, 0, 1 },
+    },
     bar = { enabled = true, texture = "flat", classColor = true, color = { 0.31, 0.76, 0.97, 0.75 } },
-    barBg = { enabled = true, color = { 1, 1, 1, 0.06 } },
+    barBg = { enabled = true, texture = "flat", color = { 1, 1, 1, 0.06 } },
     text = {
         font = "default", size = 11, outline = "none", shadow = true, columnWidth = 50,
-        name = { enabled = true, color = { 1, 1, 1, 1 } },
-        amount = { enabled = true, color = { 1, 1, 1, 1 } },
-        dps = { enabled = true, color = { 1, 1, 1, 1 } },
+        shadowColor = { 0, 0, 0, 0.9 }, shadowOffset = 1,
+        name = { enabled = true, color = { 1, 1, 1, 1 }, align = "left" },
+        amount = { enabled = true, color = { 1, 1, 1, 1 }, align = "right" },
+        dps = { enabled = true, color = { 1, 1, 1, 1 }, align = "right" },
     },
 }
 
@@ -120,6 +126,22 @@ T.SCHEMA = {
     { "text.amount.color", "color" },
     { "text.dps.enabled", "bool" },
     { "text.dps.color", "color" },
+    -- additions (M3 schema extension)
+    { "backdrop.texture", "texture" },
+    { "header.bg.enabled", "bool" },
+    { "header.bg.color", "color" },
+    { "barBg.texture", "texture" },
+    { "icon.matchRow", "bool" },
+    { "icon.size", "number", 8, 48 },
+    { "icon.crop", "number", 0, 0.3 },
+    { "icon.gap", "number", 0, 12 },
+    { "icon.border", "bool" },
+    { "icon.borderColor", "color" },
+    { "text.name.align", "align" },
+    { "text.amount.align", "align" },
+    { "text.dps.align", "align" },
+    { "text.shadowColor", "color" },
+    { "text.shadowOffset", "number", 0, 4 },
 }
 
 local SCHEMA_BY_PATH, SCHEMA_BY_LOWER = {}, {}
@@ -183,6 +205,7 @@ local function IsValid(entry, v)
     if t == "font" then return type(v) == "string" and T.FONTS[v] ~= nil end
     if t == "texture" then return type(v) == "string" and T.TEXTURES[v] ~= nil end
     if t == "outline" then return type(v) == "string" and T.OUTLINES[v] ~= nil end
+    if t == "align" then return type(v) == "string" and T.ALIGNS[v] ~= nil end
     return false
 end
 
@@ -243,7 +266,8 @@ function T.ParseValue(path, text)
         v = ParseHexColor(text)
         if not v then return nil, "expected hex color RRGGBB or RRGGBBAA (AA = opacity)" end
     else
-        local reg = (t == "font" and T.FONTS) or (t == "texture" and T.TEXTURES) or T.OUTLINES
+        local reg = (t == "font" and T.FONTS) or (t == "texture" and T.TEXTURES)
+            or (t == "align" and T.ALIGNS) or T.OUTLINES
         local l = text:lower()
         if not reg[l] then
             local keys = {}
