@@ -18,8 +18,17 @@
 - TOC: v0.1.0, new files → **game restart required**.
 - Not built yet (spec modules deferred, no need so far): Events bus, CombatSessions, PlayerTracker, WidgetManager.
 
-## Tests actually executed
-- Static validation PASSED; deploy SUCCESS (3 new, 2 updated). **Not yet loaded in game.**
+## Tests actually executed (in game, user-reported)
+- Meter loads and updates live in real combat (screenshots). Spell rows, icons, names, damage, DPS correct vs. post-combat data.
+- DPS column fixed to one decimal (AbbreviateNumbers printed full float precision).
+- Native bar smoothing (`SetValue(v, ExponentialEaseOut)`) visible in combat.
+- Header and row DPS tick down between hits (API recomputes per query) → 10 Hz text poll.
+- `/sm bars` total/top modes; `/sm test` DEMO fight simulator works.
+- Bug found & fixed via DEMO: shared render clock froze bars during combat ("shrink after combat"). Confirmed fixed in DEMO: bars correct during and after.
+- Still to verify: real-combat bars after fix, chained fights, `/sm lock` click-through, `/sm resetui`.
+
+## Added since M2 start
+- `/sm bars` (bar scale: top spell / share of total), `/sm smooth`, `/sm test [sec] [big]` (Analytics/Demo.lua, clearly labeled DEMO), `/sm bardebug`.
 
 ## Known limitations
 - In-combat number formats limited to native `AbbreviateNumbers` / `BreakUpLargeNumbers`.
