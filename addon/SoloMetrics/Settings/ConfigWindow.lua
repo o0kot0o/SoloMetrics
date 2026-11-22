@@ -293,10 +293,9 @@ constructors.color = function()
     sw.color:SetAllPoints()
     sw.border = W.Border(sw, 0.4, 0.4, 0.45, 1)
     sw:SetScript("OnClick", function()
-        local ok = W.PickColor(GetValue(row.item), function(r, g, b, a)
+        W.PickColor(sw, GetValue(row.item), function(r, g, b, a)
             SetValue(row.item, { r, g, b, a })
         end)
-        if not ok then ns.Print("Color picker unavailable on this client - type a hex value instead.") end
     end)
     row.swatch = sw
     row.swatchBack = back
@@ -588,7 +587,7 @@ local function Build()
     win = CreateFrame("Frame", "SoloMetricsConfig", UIParent)
     win:SetSize(WIN_W, WIN_H)
     win:SetPoint("CENTER")
-    -- HIGH (not DIALOG) so the native ColorPickerFrame (DIALOG) opens above it.
+    -- HIGH so the color picker (DIALOG) and option lists (TOOLTIP) open above it.
     win:SetFrameStrata("HIGH")
     win:SetToplevel(true)
     win:SetClampedToScreen(true)
@@ -795,6 +794,7 @@ local function Build()
 
     win:SetScript("OnHide", function()
         W.CloseList()
+        W.CloseColorPicker() -- closing without OK restores the original color
         if demoStartedHere and ns.Demo.IsActive() then ns.Demo.Stop() end
         demoStartedHere = false
     end)
