@@ -20,5 +20,8 @@ Agreed with ChatGPT review; user requirement: live in-combat DPS is mandatory. E
 
 **Consequences:** in-combat formatting is limited to what native functions offer (raw, `%.1f`, `AbbreviateNumbers`); percent-of-total and custom suffixes appear only post-combat. Live rows can't be re-sorted by DPS/name in combat (grayed out per spec 5.5).
 
+## D-006 — Config UI design locked (2026-11-22)
+Per `CONFIG_UI_DESIGN.md` (ChatGPT, approved): left nav + right pane + search; instant apply with per-setting/category reset and session revert; native color picker + hex RGBA; all 44 schema settings bound in v1 with Advanced sections. Implementation choices: custom flat widgets (no UIDropDownMenu, to avoid taint); UI metadata in a separate registry rather than inside the style schema, so the schema stays pure data for validation/import; window strata HIGH so the native ColorPickerFrame appears above it.
+
 ## D-004 — Lua safety lint (2026-11-22)
 `Validate-SoloMetrics.ps1` fails on combat-log event usage, `loadstring`/`RunScript`, and any `ResetAllCombatSessions` reference lacking an `SM-ALLOW-RESET` review marker.

@@ -251,6 +251,15 @@ T.GetPath = GetPath
 T.SetPath = SetPath
 T.SCHEMA_BY_PATH = SCHEMA_BY_PATH
 
+function T.GetDefault(path)
+    return DeepCopy(GetPath(DEFAULT, path))
+end
+
+function T.IsValidValue(path, v)
+    local e = SCHEMA_BY_PATH[path]
+    return e ~= nil and IsValid(e, v)
+end
+
 ---------------------------------------------------------------------------
 -- Presets (overrides applied to DEFAULT)
 ---------------------------------------------------------------------------

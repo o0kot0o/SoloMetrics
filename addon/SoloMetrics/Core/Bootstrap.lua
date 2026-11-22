@@ -27,6 +27,8 @@ local METER_DEFAULTS = {
     barScale = "top",          -- "top" (relative to top spell) | "total" (share of your total)
 }
 
+ns.METER_DEFAULTS = METER_DEFAULTS
+
 local function ApplyDefaults(target, defaults)
     for k, v in pairs(defaults) do
         if type(target[k]) ~= type(v) then target[k] = v end
@@ -82,7 +84,6 @@ end
 -- Slash commands
 ---------------------------------------------------------------------------
 local PLANNED = {
-    config = "M3",
     training = "M5", history = "M4", profile = "M5",
 }
 
@@ -90,6 +91,7 @@ local commands = {}
 
 function commands.help()
     ns.Print("v" .. ns.VERSION .. " commands:")
+    ns.Print("  /sm config - open the settings window")
     ns.Print("  /sm - show/hide the meter")
     ns.Print("  /sm edit - unlock: drag to move, right-click switches Current/Overall")
     ns.Print("  /sm lock - lock in place and make click-through")
@@ -111,6 +113,7 @@ function commands.version()
     ns.Print(("v%s, SavedVariables schema %d, load #%d"):format(ns.VERSION, ns.db.schema, ns.db.loadCount))
 end
 
+function commands.config() ns.Config.Toggle() end
 function commands.edit() ns.SpellMeter.SetLocked(false) end
 function commands.lock() ns.SpellMeter.SetLocked(true) end
 function commands.session() ns.SpellMeter.ToggleSession() end

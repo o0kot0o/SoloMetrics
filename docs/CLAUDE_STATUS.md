@@ -1,5 +1,22 @@
 # SoloMetrics — Claude Status
 
+## UPDATE 2026-11-22: M3.2a + M3.2b (+ core of M3.2c) deployed as v0.3.0 — awaiting in-game test
+
+Implements `CONFIG_UI_DESIGN.md` slices a/b. **Not yet loaded in game.**
+
+**Files:**
+- `Settings/ConfigRegistry.lua` — UI metadata: 8 categories (General, Appearance, Damage Bars, Text & Fonts, Header, Layout & Position, Visibility, Profiles), labels, tooltips, Advanced flags, dependencies, slider steps. `CoverageCheck()` asserts every `Theme.SCHEMA` path has a control (44/44 by inspection; warns in chat on open if not).
+- `Settings/Widgets.lua` — flat charcoal/teal primitives: button, checkbox, slider (+fill), edit box, shared option-list popup (font names rendered in their own font; texture options show a swatch; click-outside closes), native `ColorPickerFrame:SetupColorPickerAndShow` wrapper with exact original-RGBA restore on Cancel.
+- `Settings/ConfigWindow.lua` — `/sm config`: movable, screen-clamped, ESC-closable window (strata HIGH so the native color picker opens above it); left nav + search (matches label, tooltip and setting key; shows Advanced matches); scrollable pooled rows; instant apply; per-setting reset; "Reset category"; "Revert changes" to a validated snapshot taken on open; dependent controls dimmed + non-interactive with values preserved; slider + numeric input; color swatch (checker behind for alpha) + `#RRGGBBAA` input with validation; preset cards; demo preview button (stops on close if started there); move/lock button; independent of meter visibility/click-through.
+- `UI/SpellMeter.lua` — `ApplyMeterSetting`, `ReapplyAll`, quiet `SetLocked`.
+- `Core/Bootstrap.lua` — `/sm config`; exports `METER_DEFAULTS`.
+
+**Not yet (per plan):** undo stack (Revert covers session), mini preview art on preset cards (M3.2d), profile management + import/export (M3.2e), schema additions list.
+
+**Review request (per directive, after M3.2b):** screenshot/code review of the config window once the user has run it.
+
+---
+
 ## UPDATE 2026-11-22: M2 COMPLETE → M3 phase 1 (style system) deployed as v0.2.0, awaiting in-game test
 
 **M2 exit gate met (user-verified in real combat):** live bars move during combat and stay correct after; chained fights clean; `/sm lock` click-through; `/sm resetui`; both bar modes.

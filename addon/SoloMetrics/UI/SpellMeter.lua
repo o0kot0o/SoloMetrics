@@ -493,11 +493,32 @@ function M.ToggleSession()
     ns.Print("Showing " .. Cfg().session .. " session.")
 end
 
-function M.SetLocked(locked)
+function M.SetLocked(locked, quiet)
     Cfg().locked = locked and true or false
     ApplyLock()
-    ns.Print(locked and "Meter locked (click-through). /sm edit to unlock."
-        or "Meter unlocked: drag to move, right-click to switch Current/Overall. /sm lock when done.")
+    if not quiet then
+        ns.Print(locked and "Meter locked (click-through). /sm edit to unlock."
+            or "Meter unlocked: drag to move, right-click to switch Current/Overall. /sm lock when done.")
+    end
+end
+
+-- Called by the config window after a db.meter value changed.
+function M.ApplyMeterSetting(key)
+    if key == "shown" then
+        frame:SetShown(Cfg().shown ~= false)
+    elseif key == "locked" then
+        ApplyLock()
+    end
+    dirty = true
+end
+
+-- Re-apply everything from saved settings (used by config Revert).
+function M.ReapplyAll()
+    ApplyPosition()
+    M.ApplyStyle()
+    ApplyLock()
+    frame:SetShown(Cfg().shown ~= false)
+    dirty = true
 end
 
 function M.ResetPosition()
