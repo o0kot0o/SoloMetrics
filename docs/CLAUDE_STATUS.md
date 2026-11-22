@@ -1,6 +1,6 @@
 # SoloMetrics — Claude Status
 
-## UPDATE 2026-11-22: v0.5.0 — schema additions (CONFIG_UI_DESIGN list items 1-5) — awaiting in-game test
+## UPDATE 2026-11-22: v0.5.0 — schema additions (CONFIG_UI_DESIGN list items 1-5) — user-verified working
 
 Schema 44 → 59 settings (defaults preserve the previous look; old share codes still import):
 - `backdrop.texture`, `barBg.texture` (any registered texture, tinted via vertex color)
