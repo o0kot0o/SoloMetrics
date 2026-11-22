@@ -1,5 +1,17 @@
 # SoloMetrics — Claude Status
 
+## MILESTONE SUMMARY 2026-11-22: Widget Engine (W1–W6) — v0.8.0
+
+**Verified working in game (user):** live graph widgets (columns/dots/line follow secret values in combat); per-widget settings windows and Widgets page; focus scale labels; right-click spell → per-fight widget; per-fight graph updates after each fight (after retry fix); no Lua errors.
+**Experimental / not explicitly tested:** many-widget performance near the 12 cap; Overall-session live widgets across many fights; share-of-damage values; persistence across full restart (reload confirmed implicitly).
+**Not possible (documented):** live per-spell data (secret spellID; user accepted per-fight); per-interval DPS; live true high/low scaling.
+**Declined by user:** live "rank #N spell" counter.
+**Deferred by user:** profile acceptance tests.
+**Commits:** W1 `9fff083`, W2/W3 `2d4ceff`, focus `fdb8c33`, W4 `2d466fb`, W5/W6 `756721b`, refresh fix `dcd4e0f`.
+**Review requests for ChatGPT:** (1) WIDGETS_DESIGN.md vs. what shipped; (2) whether to add the counter widget type next or move to M4 (spell inspector / history); (3) README refresh.
+
+---
+
 ## UPDATE 2026-11-22: W5 + W6 — spell context menu and per-fight data (v0.8.0) — awaiting in-game test
 
 - `Core/APIAdapter.lua` — readable completed-fight queries (out of combat only): `SessionList()`, `SessionPlayer(id)`, `SessionSpell(id, spellID)`. Every field passes `Readable`; any secret → nil (no partial data); spellID compared only when readable. Finished sessions cached; newest session never cached (chained pulls); cache cleared on `DAMAGE_METER_RESET`.
