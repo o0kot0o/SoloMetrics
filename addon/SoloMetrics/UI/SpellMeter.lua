@@ -38,6 +38,18 @@ local function SetBarValue(bar, v)
     bar:SetValue(v)
 end
 
+-- Range changes (top spell grows every hit) must animate too, or every bar
+-- snaps when the max changes.
+local rangeSmoothing = true
+local function SetBarRange(bar, maxV)
+    if smoothing and rangeSmoothing and Cfg().smoothBars then
+        local ok = pcall(bar.SetMinMaxValues, bar, 0, maxV, smoothing)
+        if ok then return end
+        rangeSmoothing = false
+    end
+    bar:SetMinMaxValues(0, maxV)
+end
+
 function M.SmoothingAvailable()
     return smoothing ~= nil
 end
@@ -197,9 +209,13 @@ local function CreateMeter()
 
     frame:SetScript("OnUpdate", function(_, elapsed)
         accum = accum + elapsed
-        if (dirty and accum >= THROTTLE) or (accum >= COMBAT_POLL and InCombatLockdown()) then
+        if dirty and accum >= THROTTLE then
             accum = 0
-            M.Render()
+            M.Render(true)
+        elseif accum >= COMBAT_POLL and InCombatLockdown() then
+            -- text/timer only: re-setting bars would restart their animation
+            accum = 0
+            M.Render(false)
         end
     end)
     frame:SetScript("OnShow", function() dirty = true end)
@@ -211,8 +227,9 @@ end
 ---------------------------------------------------------------------------
 -- Render (single path for in-combat opaque and post-combat readable data)
 ---------------------------------------------------------------------------
-function M.Render()
-    dirty = false
+function M.Render(updateBars)
+    if updateBars == nil then updateBars = true end
+    if updateBars then dirty = false end
     local cfg = Cfg()
     local snap = ns.API.Snapshot(cfg.session)
 
@@ -228,12 +245,13 @@ function M.Render()
     local getName = C_Spell and C_Spell.GetSpellName
     local hasMax = type(snap.max) == "number"
     for i = 1, n do
+        local isNew = not rows[i] or not rows[i]:IsShown()
         local row = rows[i] or CreateRow(i)
         local sp = snap.spells[i]
         if type(sp) == "table" then
             row:SetStatusBarColor(r, g, b, 0.75)
-            if hasMax then
-                row:SetMinMaxValues(0, snap.max)
+            if hasMax and (updateBars or isNew) then
+                SetBarRange(row, snap.max)
                 SetBarValue(row, sp.totalAmount)
             end
             if getTex then row.icon:SetTexture(getTex(sp.spellID)) end
@@ -256,6 +274,14 @@ end
 -- Public controls
 ---------------------------------------------------------------------------
 function M.MarkDirty() dirty = true end
+
+-- New fight: empty all bars instantly so reused rows don't show stale values.
+function M.ResetBars()
+    for _, row in ipairs(rows) do
+        row:SetMinMaxValues(0, 1)
+        row:SetValue(0)
+    end
+end
 
 function M.Toggle()
     local show = not frame:IsShown()
@@ -292,7 +318,12 @@ function M.Init()
     for _, e in ipairs(ns.API.EVENTS) do pcall(ev.RegisterEvent, ev, e) end
     ev:RegisterEvent("PLAYER_REGEN_DISABLED")
     ev:RegisterEvent("PLAYER_REGEN_ENABLED")
-    ev:SetScript("OnEvent", function() dirty = true end)
+    ev:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_REGEN_DISABLED" and Cfg().session == "current" then
+            M.ResetBars()
+        end
+        dirty = true
+    end)
     frame:SetShown(Cfg().shown ~= false)
     if not ns.API.IsAvailable() then
         ns.Print("Native damage meter reports unavailable; meter may stay empty.")
