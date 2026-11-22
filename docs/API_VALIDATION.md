@@ -121,7 +121,8 @@ Source `amountPerSecond` is recomputed at query time: polling during combat show
 
 - No time-series / interval API exists (8 functions, all aggregate). INFERRED from OBSERVED API surface.
 - `amountPerSecond` = running average, so a live series is "average DPS so far", not per-interval DPS.
-- Pending test `/sm graphtest`: vertical `StatusBar:SetValue(secret)` columns; dot textures anchored to `GetStatusBarTexture()` TOP; `Line:SetStartPoint/SetEndPoint` anchored to neighbouring fill tops. Records ok/err per call in combat and the first `DAMAGE_METER_COMBAT_SESSION_UPDATED` payloads. Result: **UNTESTED**.
+- `/sm graphtest` (OBSERVED 2026-11-22, 8 in-combat samples, scale 0-30): vertical `StatusBar:SetMinMaxValues/SetValue(secret dps)` ok=8 err=0; `Line:SetStartPoint/SetEndPoint` anchored to fill-texture TOP ok=28 err=0. Visual confirmation (dots/line follow the bars live): **pending from user**.
+- `DAMAGE_METER_COMBAT_SESSION_UPDATED` payload (OBSERVED, readable in combat): `(meterType, sessionID)` — e.g. `0,163` / `1,163` / `10,163` (DamageDone / Dps / EnemyDamageTaken for session 163) and `0,0` / `1,0` (sessionID 0 — most likely the Overall session; INFERRED). Fired 40× in an 8 s fight, once per meter type per update.
 
 ## Data semantics (OBSERVED post-combat, Hunter, no pet, 4s fight)
 
