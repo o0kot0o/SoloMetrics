@@ -1,6 +1,8 @@
 # SoloMetrics — Claude Status
 
-## UPDATE 2026-11-22: v0.9.0 — Numeric Counter widgets — awaiting in-game test
+## UPDATE 2026-11-22: v0.9.0 — Numeric Counter widgets — loaded in game
+
+In-game: counters created and shown; one Lua error at combat start ("FontString:SetText(): Font not set" — counter frames' unused graph header text) fixed in `b00dfef`; user reports no further errors.
 
 **Implemented**
 - Widget type `counter` alongside `graph`, sharing ids, manager, frames, drag/resize, lock/click-through, visibility, shared ticker, duplicate/delete, per-widget window, validation. Unknown types still dropped safely; existing graph widgets and defaults unchanged.
