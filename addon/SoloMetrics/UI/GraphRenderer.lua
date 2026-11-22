@@ -25,7 +25,7 @@ end
 function GR.New(parent)
     local r = setmetatable({
         parent = parent, cols = {}, lines = {}, grid = {},
-        head = 0, count = 0, n = 30, max = 100, style = "area",
+        head = 0, count = 0, n = 30, max = 100, min = 0, style = "area",
     }, R)
     r.plot = CreateFrame("Frame", nil, parent)
     r.axisTop = r.plot:CreateFontString(nil, "OVERLAY")
@@ -116,12 +116,15 @@ function R:Reset()
     self.head, self.count = 0, 0
 end
 
--- max is always a readable number (fixed setting or last fight's readable value).
-function R:SetScale(max)
+-- max/min are always readable numbers (fixed setting or last fight's readable
+-- value). Values below min show as empty columns, above max as full (clipped).
+function R:SetScale(max, min)
     if type(max) ~= "number" or max <= 0 then return end
-    self.max = max
-    for _, b in ipairs(self.cols) do b:SetMinMaxValues(0, max) end
+    min = (type(min) == "number" and min >= 0 and min < max) and min or 0
+    self.max, self.min = max, min
+    for _, b in ipairs(self.cols) do b:SetMinMaxValues(min, max) end
     self.axisTop:SetText(AbbreviateNumbers(max))
+    self.axisZero:SetText(min > 0 and AbbreviateNumbers(min) or "0")
 end
 
 -- v may be secret: it only goes into SetValue.
@@ -129,7 +132,7 @@ function R:Push(v)
     if self.n <= 0 or type(v) ~= "number" then return end
     self.head = self.head % self.n + 1
     local b = self.cols[self.head]
-    b:SetMinMaxValues(0, self.max)
+    b:SetMinMaxValues(self.min, self.max)
     b:SetValue(v)
     self.count = self.count + 1
     self:Layout()

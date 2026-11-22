@@ -58,9 +58,12 @@ local function ShouldShow(w)
     return true
 end
 
-local function EffectiveMax(w)
-    if w.graph.scaleMode == "fixed" then return w.graph.scaleMax end
-    return w.graph.autoMax or w.graph.scaleMax
+-- Returns max, min (both readable).
+local function EffectiveRange(w)
+    local g = w.graph
+    if g.scaleMode == "fixed" then return g.scaleMax, 0 end
+    if g.scaleMode == "focus" and g.autoBase then return g.autoBase * 1.5, g.autoBase * 0.5 end
+    return g.autoMax or g.scaleMax, 0
 end
 
 local function MetricLabel(w)
@@ -194,7 +197,7 @@ function WM.Apply(id)
 
     f.overlayLabel:SetText(("%s [%s] - drag to move, corner to resize"):format(w.name, w.id))
     f.renderer:ApplyStyle(w)
-    f.renderer:SetScale(EffectiveMax(w))
+    f.renderer:SetScale(EffectiveRange(w))
     ApplyMouse(f, w)
     f:SetShown(ShouldShow(w))
 end
@@ -251,7 +254,7 @@ local function ResetWidgets(filter)
         local w, f = Rec(id), frames[id]
         if w and f and (not filter or filter(w)) then
             f.renderer:Reset()
-            f.renderer:SetScale(EffectiveMax(w))
+            f.renderer:SetScale(EffectiveRange(w))
             f.value:SetText("-")
             f.acc = 0
         end
@@ -269,7 +272,8 @@ local function UpdateAutoScale()
             if type(v) == "number" and v > 0 then
                 local headroom = (w.data.metric == "damage") and 1.1 or 1.5
                 w.graph.autoMax = v * headroom
-                if w.graph.scaleMode == "auto" then f.renderer:SetScale(w.graph.autoMax) end
+                w.graph.autoBase = v
+                if w.graph.scaleMode ~= "fixed" then f.renderer:SetScale(EffectiveRange(w)) end
                 SetValueText(f, w, v)
             end
         end
@@ -389,7 +393,7 @@ local HELP = {
     "/sm widget <id> metric <dps|damage> | session <current|overall>",
     "/sm widget <id> show <always|combat|nocombat|hidden>",
     "/sm widget <id> window <samples 10-60> [interval 0.5-5]",
-    "/sm widget <id> scale <auto|number> | size <scale 0.5-2>",
+    "/sm widget <id> scale <auto|focus|number> | size <scale 0.5-2>",
     "/sm widget <id> set <path> <value> | clear <path|all> | paths",
     "/sm widget <id> copyto <id> | makedefault",
 }
@@ -493,8 +497,11 @@ function WM.Command(rest)
         ns.Print(("%s window: %d samples x %.1fs = %ds"):format(id, w.graph.samples, w.graph.interval,
             math.floor(w.graph.samples * w.graph.interval)))
     elseif cmd == "scale" and val then
-        if val == "auto" then
-            w.graph.scaleMode = "auto"
+        if val == "auto" or val == "focus" then
+            w.graph.scaleMode = val
+            if val == "focus" and not w.graph.autoBase then
+                ns.Print("Focus range applies after the next completed fight (it needs that fight's readable result).")
+            end
         elseif tonumber(val) and tonumber(val) > 0 then
             w.graph.scaleMode = "fixed"
             w.graph.scaleMax = tonumber(val)

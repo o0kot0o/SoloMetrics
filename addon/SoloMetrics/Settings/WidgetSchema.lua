@@ -123,9 +123,12 @@ function WS.ValidateWidget(raw, id)
             style = OneOf(g.style, WS.STYLES, "area"),
             samples = math.floor(Num(g.samples, 10, WS.MAX_SAMPLES, 30)),
             interval = Num(g.interval, 0.5, 5, 1),
-            scaleMode = OneOf(g.scaleMode, { auto = true, fixed = true }, "auto"),
+            -- auto: 0..last fight x headroom; fixed: 0..scaleMax;
+            -- focus: 50%..150% of last fight's final value (zoomed; clips outside)
+            scaleMode = OneOf(g.scaleMode, { auto = true, fixed = true, focus = true }, "auto"),
             scaleMax = Num(g.scaleMax, 1, 1e9, 100),
             autoMax = (type(g.autoMax) == "number" and g.autoMax > 0) and g.autoMax or nil,
+            autoBase = (type(g.autoBase) == "number" and g.autoBase > 0) and g.autoBase or nil,
         },
         behavior = {
             visibility = OneOf(b.visibility, WS.VISIBILITY, "always"),
