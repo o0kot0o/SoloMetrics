@@ -104,14 +104,18 @@ end
 -- Rebuilds a per-fight widget from the last N completed fights.
 local function RefreshFights(id)
     local w, f = Rec(id), frames[id]
-    if not (w and f) or w.data.kind ~= "fights" or InCombatLockdown() then return end
+    if not (w and f) then return false, "widget not found" end
+    if w.data.kind ~= "fights" then return false, "not a per-fight widget" end
+    if InCombatLockdown() then return false, "in combat (updates after the fight)" end
     local list = ns.API.SessionList()
-    if not list then return end
+    if not list then return false, "fight list not available" end
     local n = math.min(w.graph.samples, #list, WS().MAX_FIGHTS)
     local values = {}
     for i = #list - n + 1, #list do
         local v = FightValue(w, list[i].id, i == #list)
-        if v == nil then return end -- something unreadable: keep the previous graph
+        if v == nil then -- something unreadable: keep the previous graph
+            return false, ("fight %s not readable yet"):format(tostring(list[i].id))
+        end
         values[#values + 1] = v
     end
     -- exact scale: these are readable values
@@ -133,6 +137,7 @@ local function RefreshFights(id)
     end
     f.renderer:SetSeries(values, max, min)
     SetValueText(f, w, values[#values])
+    return true, ("%d fights, newest #%s"):format(#values, tostring(list[#list] and list[#list].id))
 end
 WM.RefreshFights = RefreshFights
 
@@ -478,7 +483,7 @@ local HELP = {
     "/sm widget <id> window <samples 10-60> [interval 0.5-5]",
     "/sm widget <id> scale <auto|focus|number> | size <scale 0.5-2>",
     "/sm widget <id> set <path> <value> | clear <path|all> | paths",
-    "/sm widget <id> copyto <id> | makedefault",
+    "/sm widget <id> copyto <id> | makedefault | refresh (per-fight widgets)",
 }
 
 function WM.Command(rest)
@@ -634,6 +639,9 @@ function WM.Command(rest)
         t.appearance = ns.Theme.DeepCopy(w.appearance)
         WM.Apply(t.id)
         ns.Print("Copied appearance of " .. id .. " to " .. t.id)
+    elseif cmd == "refresh" then
+        local ok, info = RefreshFights(id)
+        ns.Print(("%s refresh: %s (%s)"):format(id, ok and "updated" or "not updated", tostring(info)))
     elseif cmd == "makedefault" then
         DB().defaults.appearance = ns.Theme.DeepCopy(w.appearance)
         ApplyAll()
@@ -659,7 +667,10 @@ function WM.Init()
         else
             inCombat = false
             C_Timer.After(0.3, UpdateAutoScale)
+            -- the finished fight may join the session list a little later: retry
             C_Timer.After(0.6, RefreshAllFights)
+            C_Timer.After(2.5, RefreshAllFights)
+            C_Timer.After(6, RefreshAllFights)
         end
         UpdateVisibility()
     end)
@@ -668,9 +679,20 @@ function WM.Init()
     -- Blizzard meter reset clears every session: drop cached per-fight data.
     local resetEv = CreateFrame("Frame")
     pcall(resetEv.RegisterEvent, resetEv, "DAMAGE_METER_RESET")
-    resetEv:SetScript("OnEvent", function()
-        ns.API.ClearCache()
-        C_Timer.After(0.5, RefreshAllFights)
+    pcall(resetEv.RegisterEvent, resetEv, "DAMAGE_METER_COMBAT_SESSION_UPDATED")
+    local pending = false
+    resetEv:SetScript("OnEvent", function(_, event)
+        if event == "DAMAGE_METER_RESET" then
+            ns.API.ClearCache()
+            C_Timer.After(0.5, RefreshAllFights)
+        elseif not InCombatLockdown() and not pending then
+            -- session data changed out of combat: refresh once, debounced
+            pending = true
+            C_Timer.After(1, function()
+                pending = false
+                RefreshAllFights()
+            end)
+        end
     end)
     C_Timer.After(1, RefreshAllFights)
 end
