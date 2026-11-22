@@ -540,7 +540,7 @@ local function Render(resetScroll)
     end
 
     content:SetHeight(math.max(y + 8, 1))
-    if resetScroll then scroll:SetVerticalScroll(0) end
+    scroll:UpdateBar(resetScroll)
     for _, b in ipairs(navButtons) do b:UpdateState() end
     footer:Refresh()
 end
@@ -695,13 +695,52 @@ local function Build()
         navButtons[i] = b
     end
 
-    -- Content scroll area
-    scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
+    -- Content scroll area: plain ScrollFrame + slim custom scrollbar that only
+    -- shows when the page is taller than the view.
+    scroll = CreateFrame("ScrollFrame", nil, win)
     scroll:SetPoint("TOPLEFT", SIDEBAR_W + 12, -46)
     scroll:SetPoint("BOTTOMRIGHT", -30, 52)
     content = CreateFrame("Frame", nil, scroll)
     content:SetSize(CONTENT_W, 10)
     scroll:SetScrollChild(content)
+
+    local bar = CreateFrame("Slider", nil, win)
+    bar:SetOrientation("VERTICAL")
+    bar:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 12, 0)
+    bar:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 12, 0)
+    bar:SetWidth(6)
+    local track = bar:CreateTexture(nil, "BACKGROUND")
+    track:SetAllPoints()
+    track:SetColorTexture(1, 1, 1, 0.05)
+    bar:SetThumbTexture("Interface\\Buttons\\WHITE8X8")
+    bar.thumb = bar:GetThumbTexture()
+    bar.thumb:SetVertexColor(0.45, 0.45, 0.5, 0.9)
+    bar.thumb:SetSize(6, 40)
+    bar:SetMinMaxValues(0, 0)
+    bar:SetValue(0)
+    bar:SetScript("OnValueChanged", function(_, v) scroll:SetVerticalScroll(v) end)
+    bar:SetScript("OnEnter", function(self) self.thumb:SetVertexColor(A[1], A[2], A[3], 1) end)
+    bar:SetScript("OnLeave", function(self) self.thumb:SetVertexColor(0.45, 0.45, 0.5, 0.9) end)
+    scroll.bar = bar
+
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", function(_, delta)
+        local _, mx = bar:GetMinMaxValues()
+        bar:SetValue(math.max(0, math.min(mx, bar:GetValue() - delta * 40)))
+    end)
+
+    function scroll:UpdateBar(resetToTop)
+        local view = self:GetHeight()
+        local total = content:GetHeight()
+        local maxV = math.max(0, total - view)
+        bar:SetMinMaxValues(0, maxV)
+        if resetToTop then bar:SetValue(0) else bar:SetValue(math.min(bar:GetValue(), maxV)) end
+        bar:SetShown(maxV > 0)
+        if total > 0 then
+            bar.thumb:SetHeight(math.max(24, view * view / total))
+        end
+        if maxV <= 0 then self:SetVerticalScroll(0) end
+    end
 
     -- Footer
     footer = CreateFrame("Frame", nil, win)

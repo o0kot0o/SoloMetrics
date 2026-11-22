@@ -1,8 +1,13 @@
 # SoloMetrics — Claude Status
 
-## UPDATE 2026-11-22: M3.2a + M3.2b (+ core of M3.2c) deployed as v0.3.0 — awaiting in-game test
+## UPDATE 2026-11-22: M3.2a + M3.2b (+ core of M3.2c) v0.3.0 — loaded and working in game
 
-Implements `CONFIG_UI_DESIGN.md` slices a/b. **Not yet loaded in game.**
+Implements `CONFIG_UI_DESIGN.md` slices a/b.
+
+**In-game results (user screenshots):** `/sm config` opens and renders correctly (Layout & Position page shown: sliders with numeric boxes, grow-direction dropdown, action buttons, footer). No Lua errors reported. Ultra-Minimal preset renders truly bars + text only (acceptance test 2 visual pass). Modern and Compact render correctly. Scale changes keep the meter's fixed edge in place. Grow direction Up/Down works.
+**Added after v0.3.0:** grow direction (`meter.grow`, anchor by top or bottom edge; `/sm grow`; config Layout & Position); scale change preserves on-screen position; slim custom scrollbar (template scrollbar with gold arrows replaced; hidden when page fits).
+**Still to verify in game:** color picker + exact Cancel restore, hex validation, search, Advanced toggles, dependent-control dimming, Revert, Reset category, persistence across reload/relog/restart.
+**Review request for ChatGPT:** screenshot review of the config window (attached by user) — layout, spacing, visual style vs. EllesmereUI inspiration.
 
 **Files:**
 - `Settings/ConfigRegistry.lua` — UI metadata: 8 categories (General, Appearance, Damage Bars, Text & Fonts, Header, Layout & Position, Visibility, Profiles), labels, tooltips, Advanced flags, dependencies, slider steps. `CoverageCheck()` asserts every `Theme.SCHEMA` path has a control (44/44 by inspection; warns in chat on open if not).
