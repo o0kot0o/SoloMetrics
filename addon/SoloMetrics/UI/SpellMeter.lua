@@ -14,7 +14,8 @@ local ROW_GAP = 1
 local ICON = 18
 local PAD = 4
 local THROTTLE = 0.2     -- event-driven: max 5 full renders/sec
-local COMBAT_POLL = 0.25 -- in combat: also refresh 4x/sec without waiting for events
+local COMBAT_POLL = 0.1  -- in combat: refresh text 10x/sec; API recomputes DPS
+                         -- continuously (observed: DPS ticks down between hits)
 
 local frame, header
 local rows = {}
@@ -243,7 +244,9 @@ function M.Render(updateBars)
     local n = math.min(snap.spellCount, cfg.maxRows)
     local getTex = C_Spell and C_Spell.GetSpellTexture
     local getName = C_Spell and C_Spell.GetSpellName
-    local hasMax = type(snap.max) == "number"
+    -- Bar scale: "top" = relative to top spell; "total" = share of player total.
+    local maxV = (cfg.barScale == "total") and snap.total or snap.max
+    local hasMax = type(maxV) == "number"
     for i = 1, n do
         local isNew = not rows[i] or not rows[i]:IsShown()
         local row = rows[i] or CreateRow(i)
@@ -251,7 +254,7 @@ function M.Render(updateBars)
         if type(sp) == "table" then
             row:SetStatusBarColor(r, g, b, 0.75)
             if hasMax and (updateBars or isNew) then
-                SetBarRange(row, snap.max)
+                SetBarRange(row, maxV)
                 SetBarValue(row, sp.totalAmount)
             end
             if getTex then row.icon:SetTexture(getTex(sp.spellID)) end

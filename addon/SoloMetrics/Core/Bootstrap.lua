@@ -25,6 +25,7 @@ local METER_DEFAULTS = {
     maxRows = 8,
     width = 280,
     smoothBars = true,
+    barScale = "top",          -- "top" (relative to top spell) | "total" (share of your total)
 }
 
 local function ApplyDefaults(target, defaults)
@@ -49,6 +50,7 @@ local function InitDB()
     if type(db.meter) ~= "table" then db.meter = {} end
     ApplyDefaults(db.meter, METER_DEFAULTS)
     if db.meter.session ~= "current" and db.meter.session ~= "overall" then db.meter.session = "current" end
+    if db.meter.barScale ~= "top" and db.meter.barScale ~= "total" then db.meter.barScale = "top" end
     if db.meter.numberFormat ~= "compact" and db.meter.numberFormat ~= "full" then db.meter.numberFormat = "compact" end
     db.meter.maxRows = math.max(1, math.min(20, math.floor(db.meter.maxRows)))
     db.meter.width = math.max(180, math.min(600, db.meter.width))
@@ -73,6 +75,7 @@ function commands.help()
     ns.Print("  /sm session - switch Current fight / Overall")
     ns.Print("  /sm format - switch compact (12.3K) / full (12,345) numbers")
     ns.Print("  /sm rows <1-20> - max spell rows")
+    ns.Print("  /sm bars - bar length: relative to top spell / share of total")
     ns.Print("  /sm smooth - toggle animated bars")
     ns.Print("  /sm resetui - re-center and unlock the meter (keeps data)")
     ns.Print("  /sm version")
@@ -92,6 +95,14 @@ function commands.format()
     m.numberFormat = (m.numberFormat == "compact") and "full" or "compact"
     ns.SpellMeter.MarkDirty()
     ns.Print("Number format: " .. m.numberFormat)
+end
+
+function commands.bars()
+    local m = ns.db.meter
+    m.barScale = (m.barScale == "top") and "total" or "top"
+    ns.SpellMeter.MarkDirty()
+    ns.Print(m.barScale == "top" and "Bars: relative to your top spell"
+        or "Bars: share of your total damage")
 end
 
 function commands.smooth()

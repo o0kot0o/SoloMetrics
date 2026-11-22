@@ -111,6 +111,10 @@ All OBSERVED 2026-11-22 (`/sm rendertest`, 11 in-combat ticks, 0 errors each). "
 
 `Enum.StatusBarInterpolation` = Immediate=0, ExponentialEaseOut=1. `StatusBar:SetValue(secret, ExponentialEaseOut)` animates visibly in combat (user confirmed), provided the value is not re-set every poll tick. Perceived jerkiness at low level comes from coarse native update cadence + small damage numbers, not the renderer.
 
+## DPS recomputation (OBSERVED 2026-11-22)
+
+Source `amountPerSecond` is recomputed at query time: polling during combat shows header DPS ticking down while the player stops attacking. Text polling at 10 Hz therefore gives a continuously live DPS readout (bars unaffected: all spells share the denominator).
+
 ## Data semantics (OBSERVED post-combat, Hunter, no pet, 4s fight)
 
 - `combatSpells` arrive **sorted by totalAmount descending** → live rows need no Lua sort.
