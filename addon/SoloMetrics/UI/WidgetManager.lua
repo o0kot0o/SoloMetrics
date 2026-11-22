@@ -219,9 +219,11 @@ local function CreateFrameFor(id)
     f.bg:SetAllPoints()
     f.border = MakeEdges(f, "BORDER")
     f.title = f:CreateFontString(nil, "OVERLAY")
+    f.title:SetFont(STANDARD_TEXT_FONT, 11, "") -- always have a font (counters never style these)
     f.title:SetJustifyH("LEFT")
     f.title:SetWordWrap(false)
     f.value = f:CreateFontString(nil, "OVERLAY")
+    f.value:SetFont(STANDARD_TEXT_FONT, 13, "")
     f.value:SetJustifyH("RIGHT")
 
     -- renderer interface: ApplyStyle(w), Reset(), Layout() + type-specific setters
@@ -385,8 +387,10 @@ local function ResetWidgets(filter)
         local w, f = Rec(id), frames[id]
         if w and f and (not filter or filter(w)) then
             f.renderer:Reset()
-            if w.type == "graph" then f.renderer:SetScale(EffectiveRange(w)) end
-            f.value:SetText("-")
+            if w.type == "graph" then
+                f.renderer:SetScale(EffectiveRange(w))
+                f.value:SetText("-")
+            end
             f.acc = 0
         end
     end
