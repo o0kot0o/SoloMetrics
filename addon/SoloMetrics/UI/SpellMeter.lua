@@ -23,6 +23,25 @@ local accum = 0
 
 local function Cfg() return ns.db.meter end
 
+-- Native bar smoothing: the engine animates toward the new value itself, so it
+-- works with secret values (no Lua interpolation of protected numbers).
+-- Disabled automatically if the client rejects the argument.
+local smoothing = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
+
+local function SetBarValue(bar, v)
+    if smoothing and Cfg().smoothBars then
+        local ok = pcall(bar.SetValue, bar, v, smoothing)
+        if ok then return end
+        smoothing = nil
+        ns.Print("Bar smoothing not supported by this client; using instant bars.")
+    end
+    bar:SetValue(v)
+end
+
+function M.SmoothingAvailable()
+    return smoothing ~= nil
+end
+
 ---------------------------------------------------------------------------
 -- Formatting (v may be secret: only native functions touch it)
 ---------------------------------------------------------------------------
@@ -215,7 +234,7 @@ function M.Render()
             row:SetStatusBarColor(r, g, b, 0.75)
             if hasMax then
                 row:SetMinMaxValues(0, snap.max)
-                row:SetValue(sp.totalAmount)
+                SetBarValue(row, sp.totalAmount)
             end
             if getTex then row.icon:SetTexture(getTex(sp.spellID)) end
             if getName then row.name:SetText(getName(sp.spellID)) end

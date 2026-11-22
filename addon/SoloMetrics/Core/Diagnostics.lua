@@ -183,6 +183,15 @@ function D.Run()
         tostring(version), tostring(build), tostring(date), tostring(toc)))
     out(("Addon: v%s, SV schema %d, load #%d"):format(ns.VERSION, ns.db.schema, ns.db.loadCount))
     out("issecretvalue: " .. type(issecretvalue))
+    local interp = Enum and Enum.StatusBarInterpolation
+    if type(interp) == "table" then
+        local parts = {}
+        for _, k in ipairs(SortedKeys(interp)) do parts[#parts + 1] = KeyLabel(k) .. "=" .. tostring(interp[k]) end
+        out("Enum.StatusBarInterpolation: " .. table.concat(parts, ", "))
+    else
+        out("Enum.StatusBarInterpolation: MISSING")
+    end
+    out("Bar smoothing active: " .. tostring(ns.SpellMeter and ns.SpellMeter.SmoothingAvailable() and ns.db.meter.smoothBars))
 
     local inCombat = InCombat()
     out("In combat: " .. tostring(inCombat))

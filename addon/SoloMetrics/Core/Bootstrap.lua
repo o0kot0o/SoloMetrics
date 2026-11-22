@@ -24,6 +24,7 @@ local METER_DEFAULTS = {
     numberFormat = "compact",  -- "compact" (AbbreviateNumbers) | "full" (BreakUpLargeNumbers)
     maxRows = 8,
     width = 280,
+    smoothBars = true,
 }
 
 local function ApplyDefaults(target, defaults)
@@ -72,6 +73,7 @@ function commands.help()
     ns.Print("  /sm session - switch Current fight / Overall")
     ns.Print("  /sm format - switch compact (12.3K) / full (12,345) numbers")
     ns.Print("  /sm rows <1-20> - max spell rows")
+    ns.Print("  /sm smooth - toggle animated bars")
     ns.Print("  /sm resetui - re-center and unlock the meter (keeps data)")
     ns.Print("  /sm version")
     ns.Print("  diagnostics: /sm debug, /sm probe, /sm watch, /sm rendertest, /sm copy")
@@ -90,6 +92,16 @@ function commands.format()
     m.numberFormat = (m.numberFormat == "compact") and "full" or "compact"
     ns.SpellMeter.MarkDirty()
     ns.Print("Number format: " .. m.numberFormat)
+end
+
+function commands.smooth()
+    local m = ns.db.meter
+    m.smoothBars = not m.smoothBars
+    if m.smoothBars and not ns.SpellMeter.SmoothingAvailable() then
+        ns.Print("Bar smoothing ON, but this client has no native StatusBar interpolation - bars stay instant.")
+    else
+        ns.Print("Bar smoothing " .. (m.smoothBars and "ON" or "OFF"))
+    end
 end
 
 function commands.rows(rest)
