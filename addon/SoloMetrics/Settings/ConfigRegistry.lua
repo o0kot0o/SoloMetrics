@@ -40,6 +40,8 @@ R.CATEGORIES = {
               tip = "Top spell: your best ability is always a full bar. Share of total: all bars add up to 100%." },
             { kind = "meter", key = "smoothBars", type = "bool", label = "Smooth bar animation",
               tip = "Bars glide to new values (engine-side animation, safe with protected combat values)." },
+            { kind = "meter", key = "minimapShown", type = "bool", label = "Show minimap button",
+              tip = "Left-click opens settings, right-click shows/hides the meter. SoloMetrics is also in the addon compartment menu where supported." },
         },
     },
     {

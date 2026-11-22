@@ -541,6 +541,8 @@ function M.ApplyMeterSetting(key)
         ApplyLock()
     elseif key == "grow" then
         Reanchor()
+    elseif key == "minimapShown" then
+        ns.MinimapButton.Update()
     end
     dirty = true
 end

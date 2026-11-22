@@ -25,6 +25,8 @@ local METER_DEFAULTS = {
     maxRows = 8,
     smoothBars = true,
     grow = "down",             -- "down" (top edge fixed) | "up" (bottom edge fixed)
+    minimapShown = true,
+    minimapAngle = 225,
     barScale = "top",          -- "top" (relative to top spell) | "total" (share of your total)
 }
 
@@ -53,6 +55,7 @@ local function InitDB()
     ApplyDefaults(db.meter, METER_DEFAULTS)
     if db.meter.session ~= "current" and db.meter.session ~= "overall" then db.meter.session = "current" end
     db.meter.barOrder = nil -- removed experiment
+    db.meter.minimapAngle = db.meter.minimapAngle % 360
     if db.meter.grow ~= "down" and db.meter.grow ~= "up" then db.meter.grow = "down" end
     if db.meter.barScale ~= "top" and db.meter.barScale ~= "total" then db.meter.barScale = "top" end
     if db.meter.numberFormat ~= "compact" and db.meter.numberFormat ~= "full" then db.meter.numberFormat = "compact" end
@@ -95,6 +98,7 @@ function commands.help()
     ns.Print("v" .. ns.VERSION .. " commands:")
     ns.Print("  /sm config - open the settings window")
     ns.Print("  /sm - show/hide the meter")
+    ns.Print("  /sm minimap - show/hide the minimap button")
     ns.Print("  /sm edit - unlock: drag to move, right-click switches Current/Overall")
     ns.Print("  /sm lock - lock in place and make click-through")
     ns.Print("  /sm session - switch Current fight / Overall")
@@ -179,6 +183,13 @@ function commands.get(rest)
     end
 end
 
+function commands.minimap()
+    local m = ns.db.meter
+    m.minimapShown = not m.minimapShown
+    ns.MinimapButton.Update()
+    ns.Print("Minimap button " .. (m.minimapShown and "shown." or "hidden. /sm minimap or /sm config to bring it back."))
+end
+
 function commands.grow()
     local m = ns.db.meter
     m.grow = (m.grow == "down") and "up" or "down"
@@ -254,5 +265,6 @@ loader:SetScript("OnEvent", function(self, event, name)
     self:UnregisterEvent("ADDON_LOADED")
     InitDB()
     ns.SpellMeter.Init()
+    ns.MinimapButton.Init()
     ns.Print(("v%s loaded. Type /sm help."):format(ns.VERSION))
 end)
