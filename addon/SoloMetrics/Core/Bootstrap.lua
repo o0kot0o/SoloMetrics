@@ -24,6 +24,7 @@ local METER_DEFAULTS = {
     numberFormat = "compact",  -- "compact" (AbbreviateNumbers) | "full" (BreakUpLargeNumbers)
     maxRows = 8,
     smoothBars = true,
+    grow = "down",             -- "down" (top edge fixed) | "up" (bottom edge fixed)
     barScale = "top",          -- "top" (relative to top spell) | "total" (share of your total)
 }
 
@@ -52,6 +53,7 @@ local function InitDB()
     ApplyDefaults(db.meter, METER_DEFAULTS)
     if db.meter.session ~= "current" and db.meter.session ~= "overall" then db.meter.session = "current" end
     db.meter.barOrder = nil -- removed experiment
+    if db.meter.grow ~= "down" and db.meter.grow ~= "up" then db.meter.grow = "down" end
     if db.meter.barScale ~= "top" and db.meter.barScale ~= "total" then db.meter.barScale = "top" end
     if db.meter.numberFormat ~= "compact" and db.meter.numberFormat ~= "full" then db.meter.numberFormat = "compact" end
     db.meter.maxRows = math.max(1, math.min(20, math.floor(db.meter.maxRows)))
@@ -101,6 +103,7 @@ function commands.help()
     ns.Print("  /sm preset [name] - list or apply a style preset")
     ns.Print("  /sm get [prefix] - list style settings, e.g. /sm get text")
     ns.Print("  /sm set <setting> <value> - e.g. /sm set backdrop.enabled off")
+    ns.Print("  /sm grow - grow direction: down (top fixed) / up (bottom fixed)")
     ns.Print("  /sm bars - bar length: relative to top spell / share of total")
     ns.Print("  /sm smooth - toggle animated bars")
     ns.Print("  /sm test [seconds] [big] - simulated DEMO fight (fake numbers); again to clear")
@@ -174,6 +177,13 @@ function commands.get(rest)
                 e[1], ns.Theme.FormatValue(e, ns.Theme.GetPath(st, e[1])), range))
         end
     end
+end
+
+function commands.grow()
+    local m = ns.db.meter
+    m.grow = (m.grow == "down") and "up" or "down"
+    ns.SpellMeter.ApplyMeterSetting("grow")
+    ns.Print(m.grow == "up" and "Meter grows upward (bottom edge fixed)." or "Meter grows downward (top edge fixed).")
 end
 
 function commands.bars()

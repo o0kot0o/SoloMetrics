@@ -286,9 +286,23 @@ end
 ---------------------------------------------------------------------------
 -- Position, lock, edit overlay
 ---------------------------------------------------------------------------
+-- Anchor the meter by the edge that must stay fixed: TOPLEFT when growing
+-- down, BOTTOMLEFT when growing up (so rows extend upward from a meter placed
+-- at the bottom of the screen). Keeps the current on-screen position.
+local function Reanchor()
+    local left = frame:GetLeft()
+    local top, bottom = frame:GetTop(), frame:GetBottom()
+    if not (left and top and bottom) then return end
+    local up = Cfg().grow == "up"
+    local point = up and "BOTTOMLEFT" or "TOPLEFT"
+    local y = up and bottom or top
+    frame:ClearAllPoints()
+    frame:SetPoint(point, UIParent, "BOTTOMLEFT", left, y)
+    Cfg().point = { point, "BOTTOMLEFT", left, y }
+end
+
 local function SavePosition()
-    local point, _, relPoint, x, y = frame:GetPoint(1)
-    Cfg().point = { point, relPoint, x, y }
+    Reanchor()
 end
 
 local function ApplyPosition()
@@ -330,6 +344,8 @@ local function CreateMeter()
     end)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
+        -- position is ours (SavedVariables), not the client's layout cache
+        if self.SetUserPlaced then self:SetUserPlaced(false) end
         SavePosition()
     end)
     frame:SetScript("OnMouseUp", function(_, button)
@@ -508,6 +524,8 @@ function M.ApplyMeterSetting(key)
         frame:SetShown(Cfg().shown ~= false)
     elseif key == "locked" then
         ApplyLock()
+    elseif key == "grow" then
+        Reanchor()
     end
     dirty = true
 end
@@ -528,6 +546,7 @@ function M.ResetPosition()
     ApplyPosition()
     ApplyLock()
     frame:Show()
+    C_Timer.After(0, Reanchor)
     dirty = true
 end
 
@@ -545,6 +564,8 @@ function M.Init()
         dirty = true
     end)
     frame:SetShown(Cfg().shown ~= false)
+    -- convert any older saved anchor to the grow-direction anchor once laid out
+    C_Timer.After(0, Reanchor)
     if not ns.API.IsAvailable() then
         ns.Print("Native damage meter reports unavailable; meter may stay empty.")
     end
