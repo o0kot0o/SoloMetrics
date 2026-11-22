@@ -7,12 +7,12 @@ Status values: `SUPPORTED`, `PARTIAL`, `UNSUPPORTED`, `UNTESTED`. A status chang
 | Flag | Status | Evidence |
 | --- | --- | --- |
 | native_meter_available | SUPPORTED | `IsDamageMeterAvailable() → true` |
-| player_totals_live_display | SUPPORTED (visual confirm pending) | secret total/DPS accepted by SetText/SetFormattedText/AbbreviateNumbers in combat |
+| player_totals_live_display | SUPPORTED (user visually confirmed) | secret total/DPS accepted by SetText/SetFormattedText/AbbreviateNumbers in combat |
 | player_totals_postcombat_readable | SUPPORTED | readable at combat end +0s |
-| spell_data_live_display | SUPPORTED (visual confirm pending) | secret spellID → GetSpellTexture/GetSpellName; SetValue/SetMinMaxValues accept secrets; rows pre-sorted |
+| spell_data_live_display | SUPPORTED (user visually confirmed) | secret spellID → GetSpellTexture/GetSpellName; SetValue/SetMinMaxValues accept secrets; rows pre-sorted |
 | spell_data_postcombat_readable | SUPPORTED | readable at combat end +0s |
 | source_owner_attribution | UNTESTED | |
-| pet_breakdown_reliable | UNTESTED | |
+| pet_breakdown_reliable | UNTESTED | user's Hunter has no pet yet; retest at pet level |
 | guardian_breakdown_reliable | UNTESTED | |
 | sampleable_numeric_dps_live | UNTESTED | Community report says live curves are blocked; verify |
 | postcombat_session_history | UNTESTED | |
