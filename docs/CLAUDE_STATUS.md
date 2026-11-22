@@ -25,7 +25,8 @@
 - Header and row DPS tick down between hits (API recomputes per query) → 10 Hz text poll.
 - `/sm bars` total/top modes; `/sm test` DEMO fight simulator works.
 - Bug found & fixed via DEMO: shared render clock froze bars during combat ("shrink after combat"). Confirmed fixed in DEMO: bars correct during and after.
-- Still to verify: real-combat bars after fix, chained fights, `/sm lock` click-through, `/sm resetui`.
+- `/sm bars` top mode: top bar full width (correct). `/sm lock` click-through works. `/sm resetui` works.
+- Still to verify: real-combat bars after the clock fix, chained fights (no stale/duplicate rows).
 
 ## Added since M2 start
 - `/sm bars` (bar scale: top spell / share of total), `/sm smooth`, `/sm test [sec] [big]` (Analytics/Demo.lua, clearly labeled DEMO), `/sm bardebug`.
