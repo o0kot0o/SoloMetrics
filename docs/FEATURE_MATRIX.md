@@ -6,17 +6,17 @@ Status values: `SUPPORTED`, `PARTIAL`, `UNSUPPORTED`, `UNTESTED`. A status chang
 
 | Flag | Status | Evidence |
 | --- | --- | --- |
-| native_meter_available | UNTESTED | |
-| player_totals_live_display | UNTESTED | |
-| player_totals_postcombat_readable | UNTESTED | |
-| spell_data_live_display | UNTESTED | |
-| spell_data_postcombat_readable | UNTESTED | |
+| native_meter_available | SUPPORTED | `IsDamageMeterAvailable() → true` |
+| player_totals_live_display | SUPPORTED (visual confirm pending) | secret total/DPS accepted by SetText/SetFormattedText/AbbreviateNumbers in combat |
+| player_totals_postcombat_readable | SUPPORTED | readable at combat end +0s |
+| spell_data_live_display | SUPPORTED (visual confirm pending) | secret spellID → GetSpellTexture/GetSpellName; SetValue/SetMinMaxValues accept secrets; rows pre-sorted |
+| spell_data_postcombat_readable | SUPPORTED | readable at combat end +0s |
 | source_owner_attribution | UNTESTED | |
 | pet_breakdown_reliable | UNTESTED | |
 | guardian_breakdown_reliable | UNTESTED | |
 | sampleable_numeric_dps_live | UNTESTED | Community report says live curves are blocked; verify |
 | postcombat_session_history | UNTESTED | |
-| session_duration_available | UNTESTED | |
+| session_duration_available | SUPPORTED | `GetSessionDurationSeconds(Current)` readable even in combat |
 | savedvariables_persist | UNTESTED | M0 `/sm version` load counter tests this across /reload, logout, restart |
 
 ## Product features

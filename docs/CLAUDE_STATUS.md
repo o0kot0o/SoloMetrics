@@ -21,7 +21,13 @@
 - Player isolation works both ways: `isLocalPlayer` (readable in combat) and `SourceFromType(..., UnitGUID("player"))`.
 - Implication: post-combat meter is fully feasible with exact data. Live meter depends on whether native setters accept secrets → `/sm rendertest` (below).
 
-## Step 3: `/sm rendertest` (deployed, not yet run in game)
+## RESULT: live meter is feasible (OBSERVED `/sm rendertest`, Hunter, 4s fight)
+- All 13 native setter paths accepted secret values in combat, 0 errors (11 ticks each): SetText, SetFormattedText, AbbreviateNumbers, BreakUpLargeNumbers, string.format, GetSpellTexture/GetSpellName with secret spellID, SetTexture, StatusBar SetMinMaxValues/SetValue. Visual confirmation from user pending.
+- Spells arrive pre-sorted desc; spell sum == source total; `playerSource.maxAmount` == top spell → live bars scale with no Lua math.
+- Source DPS = total / integer session duration. Spell DPS uses a different fractional denominator (~4.6s vs 4s) → spell DPS do not sum to source DPS.
+- **User requirement: live in-combat DPS is mandatory.** Proposed design: opaque passthrough of secret values to native setters during combat, driven by `DAMAGE_METER_COMBAT_SESSION_UPDATED` (throttled); exact readable data post-combat for history/inspector/training.
+
+## Step 3: `/sm rendertest`
 Live panel that, every 0.25s in combat, passes secret values straight into native setters via pcall and counts ok/err per call: `FontString:SetText`, `SetFormattedText`, `AbbreviateNumbers`, `BreakUpLargeNumbers`, `string.format`, `C_Spell.GetSpellTexture/GetSpellName(secret spellID)`, `Texture:SetTexture`, `StatusBar:SetMinMaxValues/SetValue`. After combat it prints a correctness report: spell sort order, sum of spells vs totals, `maxAmount` meaning, apiDPS vs total/duration ratio, spells with `creatureName` (pet attribution), full spell list.
 
 ## What changed in step 2 (files)
@@ -46,5 +52,8 @@ Live panel that, every 0.25s in combat, passes secret values straight into nativ
 
 4. If native setters accept secrets, is relying on that (live text/bars from opaque values, no Lua arithmetic) considered compliant/intended usage? It is how Blizzard's own meter must work.
 
+5. Spell `amountPerSecond` denominator differs from source DPS denominator. Display API values as-is (spec: don't recompute), or show a note?
+6. Abbreviation of secrets works only via Blizzard's `AbbreviateNumbers`; custom formats (precise "12.34K", custom suffix) can't be computed in combat. OK to limit in-combat formats to what native functions offer?
+
 ## Next proposed step
-User runs `/reload`, `/sm rendertest`, fights, watches the panel in combat, pastes the report. Then M1 exit: decide live-display design (opaque passthrough vs. post-combat only) and start M2.
+Remaining M1 checks: user's visual confirmation of the panel; Hunter pet test (pet out) to see whether pet damage is a separate source, merged into the player, or tagged via `creatureName`. Then M2: live personal meter (header DPS/total/timer + pre-sorted spell rows with icon, name, bar, amount, DPS) via opaque passthrough.

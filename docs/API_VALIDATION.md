@@ -91,11 +91,35 @@ Solo fight: `combatSources` had 1 entry. `combatSpells` grew 2 (at +3s) → 6 (e
 
 | Path | Accepts secret? | Notes |
 | --- | --- | --- |
-| `FontString:SetText(secret)` | UNTESTED | |
-| `StatusBar:SetValue(secret)` | UNTESTED | |
+All OBSERVED 2026-11-22 (`/sm rendertest`, 11 in-combat ticks, 0 errors each). "Accepts" = no Lua error; visual confirmation pending from user.
+
+| Path | Accepts secret in combat? |
+| --- | --- |
+| `FontString:SetText(source.totalAmount)` | yes |
+| `FontString:SetText(source.amountPerSecond)` | yes |
+| `FontString:SetFormattedText('%.1f', amountPerSecond)` | yes |
+| `AbbreviateNumbers(secret)` → `SetText` | yes |
+| `BreakUpLargeNumbers(secret)` | yes |
+| `string.format('%.1f', secret)` | yes (result presumably a secret string) |
+| `C_Spell.GetSpellTexture(secret spellID)` → `Texture:SetTexture` | yes |
+| `C_Spell.GetSpellName(secret spellID)` → `FontString:SetText` | yes |
+| `StatusBar:SetMinMaxValues(0, secret maxAmount)` | yes |
+| `StatusBar:SetValue(secret spell.totalAmount)` | yes |
+| `FontString:SetText(spell.totalAmount)` | yes |
+
+## Data semantics (OBSERVED post-combat, Hunter, no pet, 4s fight)
+
+- `combatSpells` arrive **sorted by totalAmount descending** → live rows need no Lua sort.
+- `sum(spell.totalAmount) == playerSource.totalAmount == source.totalAmount == session.totalAmount` (solo, no pet).
+- `playerSource.maxAmount == combatSpells[1].totalAmount` → live relative bar scaling via `SetMinMaxValues(0, maxAmount)`.
+- `session.maxAmount` = top source total (65 = player).
+- Source `amountPerSecond` == `totalAmount / session.durationSeconds` exactly (65/4 = 16.25; duration is an integer here).
+- Spell `amountPerSecond` uses a **different, fractional denominator** (~4.601 s for both spells: 35/7.607, 30/6.520). Spell DPS values therefore don't sum to source DPS.
+- `creatureName` empty for player spells; `combatSpellDetails` empty arrays.
 
 ## Log
 
 - **2026-11-22, build 71037** — `/sm debug` out of combat after several Webwood Spider fights. All 8 functions present; enums above; `IsDamageMeterAvailable() → true, ""`; 30 sessions listed (IDs 59, 60, 61… with mob names and durations). Source: OBSERVED (user paste).
+- **2026-11-22, build 71037** — `/sm rendertest`, Hunter (no pet), 4s fight, Arcane Shot (3044) 35 + Auto Shot (75) 30 = 65. All 13 native setter paths accepted secrets in combat, 0 errors. Correctness checks above. Source: OBSERVED.
 - **2026-11-22, build 71037** — `/sm watch` over one solo fight: secret-status table and events above. Source: OBSERVED.
 - **2026-11-22, build 71037** — `/sm debug` again after one fight (Githyiss the Vile, 6s). List still #30: first entry now ID 60, new ID 62 at end → FIFO cap of 30 sessions; new fight readable in list out of combat. Source: OBSERVED.
