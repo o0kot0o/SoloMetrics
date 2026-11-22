@@ -26,7 +26,6 @@ local METER_DEFAULTS = {
     width = 280,
     smoothBars = true,
     barScale = "top",          -- "top" (relative to top spell) | "total" (share of your total)
-    barOrder = "range",        -- experiment: "range" (range then value) | "value" (value then range)
 }
 
 local function ApplyDefaults(target, defaults)
@@ -51,7 +50,7 @@ local function InitDB()
     if type(db.meter) ~= "table" then db.meter = {} end
     ApplyDefaults(db.meter, METER_DEFAULTS)
     if db.meter.session ~= "current" and db.meter.session ~= "overall" then db.meter.session = "current" end
-    if db.meter.barOrder ~= "range" and db.meter.barOrder ~= "value" then db.meter.barOrder = "range" end
+    db.meter.barOrder = nil -- removed experiment
     if db.meter.barScale ~= "top" and db.meter.barScale ~= "total" then db.meter.barScale = "top" end
     if db.meter.numberFormat ~= "compact" and db.meter.numberFormat ~= "full" then db.meter.numberFormat = "compact" end
     db.meter.maxRows = math.max(1, math.min(20, math.floor(db.meter.maxRows)))
@@ -106,13 +105,6 @@ function commands.bars()
     ns.SpellMeter.MarkDirty()
     ns.Print(m.barScale == "top" and "Bars: relative to your top spell"
         or "Bars: share of your total damage")
-end
-
-function commands.barorder()
-    local m = ns.db.meter
-    m.barOrder = (m.barOrder == "range") and "value" or "range"
-    ns.SpellMeter.MarkDirty()
-    ns.Print("Bar update order (experiment): " .. (m.barOrder == "range" and "range then value" or "value then range"))
 end
 
 function commands.smooth()

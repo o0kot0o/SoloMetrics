@@ -717,8 +717,8 @@ function D.BarDebug()
         return
     end
     local cfg = ns.db.meter
-    out(("barScale=%s barOrder=%s smoothBars=%s session=%s smoothingAvailable=%s demo=%s"):format(
-        tostring(cfg.barScale), tostring(cfg.barOrder), tostring(cfg.smoothBars), tostring(cfg.session),
+    out(("barScale=%s smoothBars=%s session=%s smoothingAvailable=%s demo=%s"):format(
+        tostring(cfg.barScale), tostring(cfg.smoothBars), tostring(cfg.session),
         tostring(ns.SpellMeter.SmoothingAvailable()), tostring(demo)))
     out(("GetTime=%.1f"):format(GetTime()))
     local snap = demo and ns.Demo.Snapshot() or ns.API.Snapshot(cfg.session)

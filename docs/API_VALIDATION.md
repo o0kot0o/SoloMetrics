@@ -111,7 +111,7 @@ All OBSERVED 2026-11-22 (`/sm rendertest`, 11 in-combat ticks, 0 errors each). "
 
 `Enum.StatusBarInterpolation` = Immediate=0, ExponentialEaseOut=1. `StatusBar:SetValue(secret, ExponentialEaseOut)` animates visibly in combat (user confirmed), provided the value is not re-set every poll tick. Perceived jerkiness at low level comes from coarse native update cadence + small damage numbers, not the renderer.
 
-**Range interpolation:** `SetMinMaxValues(0, secretMax, ExponentialEaseOut)` (3rd arg, undocumented) → bars appeared wrong in combat and "shrank" to correct size at combat end (post-combat `/sm bardebug` showed correct readable min/max/value). Likely the range was not applied in combat. Reverted to plain `SetMinMaxValues(0, max)` (verified in rendertest). OBSERVED/INFERRED 2026-11-22.
+**Correction (2026-11-22):** the "bars shrink at combat end" symptom was an addon bug, not an API limitation: the 10 Hz text poll shared an accumulator with the 0.2 s bar render, so bars were never re-rendered during combat (frozen at their first value). Reproduced with readable DEMO data (smoothing off → top bar full in total mode; value-before-range → bars clamped near 0). Fixed with separate clocks. The earlier conclusion that `SetMinMaxValues(..., interpolation)` fails in combat is therefore **UNVERIFIED**; plain `SetMinMaxValues` is used.
 
 ## DPS recomputation (OBSERVED 2026-11-22)
 

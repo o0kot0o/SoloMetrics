@@ -20,7 +20,7 @@ local COMBAT_POLL = 0.1  -- in combat: refresh text 10x/sec; API recomputes DPS
 local frame, header
 local rows = {}
 local dirty = true
-local accum = 0
+local accum, pollAccum = 0, 0
 
 local function Cfg() return ns.db.meter end
 
@@ -203,14 +203,18 @@ local function CreateMeter()
     header.empty:SetPoint("TOPRIGHT", -PAD, -HEADER_H)
     header.empty:SetText("No damage yet")
 
+    -- Separate clocks: the 10 Hz text poll must not starve the event-driven
+    -- full render (a shared accumulator froze bars for the whole fight).
     frame:SetScript("OnUpdate", function(_, elapsed)
         accum = accum + elapsed
+        pollAccum = pollAccum + elapsed
         if dirty and accum >= THROTTLE then
             accum = 0
+            pollAccum = 0
             M.Render(true)
-        elseif accum >= COMBAT_POLL and (InCombatLockdown() or ns.Demo.IsRunning()) then
+        elseif pollAccum >= COMBAT_POLL and (InCombatLockdown() or ns.Demo.IsRunning()) then
             -- text/timer only: re-setting bars would restart their animation
-            accum = 0
+            pollAccum = 0
             M.Render(false)
         end
     end)
@@ -258,15 +262,9 @@ function M.Render(updateBars)
         if type(sp) == "table" then
             row:SetStatusBarColor(r, g, b, 0.75)
             if hasMax and (updateBars or isNew) then
-                -- barOrder is an experiment: does a range change apply while
-                -- a value interpolation is in flight? (see API_VALIDATION)
-                if cfg.barOrder == "value" then
-                    SetBarValue(row, sp.totalAmount)
-                    SetBarRange(row, maxV)
-                else
-                    SetBarRange(row, maxV)
-                    SetBarValue(row, sp.totalAmount)
-                end
+                -- range first: SetValue clamps to the current range
+                SetBarRange(row, maxV)
+                SetBarValue(row, sp.totalAmount)
             end
             if getTex then row.icon:SetTexture(getTex(sp.spellID)) end
             if getName then row.name:SetText(getName(sp.spellID)) end
